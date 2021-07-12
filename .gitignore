@@ -1,0 +1,25 @@
+logs/
+**/logs/
+*._*
+REMOVEME/
+tutorials/
+.DS_Store
+.Rhistory
+drafts/
+raw_files/
+refs/
+results/
+*snakemake*
+*tar.gz
+*md5*
+dag.svg
+<<<<<<< HEAD
+=======
+*.txt
+*.png
+*.pdf
+*infercnv_obj
+*.dag
+*.gistic
+*.RData
+*.csv
