@@ -4,7 +4,7 @@ home_dir <- "/Users/torpor/clusterHome/"
 project_dir <- paste0(home_dir, "projects/ewing_ctDNA/")
 ref_dir <- paste0(project_dir, "refs/")
 
-func_dir <- paste0(project_dir, "scripts/functions/")
+func_dir <- paste0(project_dir, "scripts/functions/5.fusion_call_heatmaps/")
 fusion_dir <- paste0(project_dir, "results/fusions/")
 VAF_dir <- paste0(project_dir, "results/VAF_calculation/")
 
@@ -12,6 +12,7 @@ detection_dir <- paste0(project_dir, "results/detection_heatmaps/")
 Robject_dir <- paste0(detection_dir, "/Rdata/")
 plot_dir <- paste0(VAF_dir, "plots/")
 
+system(paste0("mkdir -p ", func_dir))
 system(paste0("mkdir -p ", Robject_dir))
 system(paste0("mkdir -p ", plot_dir))
 
@@ -120,30 +121,26 @@ for (i in 1:length(fusion_nos)) {
   
 }
 
+# fetch VAFs with most supporting reads for each sample, 
+# prioritising high conf:
 VAFs <- unlist(
   lapply(samplenames, function(x) {
     
     print(x)
     
     all_VAFs <- tryCatch(
-      read.table(
-        paste0(VAF_dir, x, "/VAFs.txt"),
-        header = F
-      ),
+      all_VAFs <- readRDS(paste0(VAF_dir, x, "/Rdata/VAFs.Rdata")),
       error=function(err) NA
     )
     
     if (suppressWarnings(!is.na(all_VAFs))) {
-      return(max(all_VAFs$V2))
+      return(max(all_VAFs$VAF_fwd))
     } else {
-      return(all_VAFs)
+      return(0)
     }
     
   })
 )
-
-# turn NAs to 0:
-VAFs[is.na(VAFs)] <- 0
 
 VAF_df <- data.frame(
   VAF = VAFs
@@ -153,6 +150,11 @@ VAF_df$Sample <- gsub(
   sub(".*?_(.+)", "\\1", unlist(samplenames))
 )
 
+# save VAFs:
+VAF_df <- VAF_df %>% column_to_rownames("Sample")
+saveRDS(VAF_df, paste0(Robject_dir, "all_VAFs.Rdata"))
+
+# merge VAFs with fusion df:
 fusion_dfs <- lapply(fusion_dfs, function(x) {
   x <- merge(
     x,
@@ -165,22 +167,22 @@ fusion_dfs <- lapply(fusion_dfs, function(x) {
 
 # fetch fusion-supporting reads:
 fusion_read_nos <- sapply(samplenames, function(x) {
-  
+
   print(x)
-  
+
   return(
     read.table(
-      paste0(VAF_dir, x, "/tables/non_specific_fusion_supporting_reads.txt"),
-      header = F
-    )
+      paste0(VAF_dir, x, "/non_specific_fusion_supporting_reads.tsv"),
+      header = T
+    )[1,1]
   )
 })
 fusion_read_nos <- data.frame(
   Sample = gsub(
-    "_.*$", "", 
+    "_.*$", "",
     sub(".*?_(.+)", "\\1", unlist(samplenames))
   ),
-  Supporting_read_pairs = unlist(fusion_read_nos)
+  Supporting_read_pairs = fusion_read_nos
 )
 
 # add to fusion_dfs:
@@ -194,7 +196,7 @@ fusion_dfs <- lapply(fusion_dfs, function(x) {
   )
 })
 
-#save.image(paste0(Robject_dir, "temp_img.Rdata"))
+save.image(paste0(Robject_dir, "temp_img.Rdata"))
 #load(paste0(Robject_dir, "temp_img.Rdata"))
 
 
@@ -206,7 +208,7 @@ patient_heatmap_FP <- longitudinal_heatmap(
   fusion_df = fusion_dfs$patient,
   hm_title = "Patient EWSR1/FLI1 fusion detections",
   type = "patient",
-  annotation = "false positives",
+  annot = "false positives",
   hm_cols = hm_cols
 )
 
@@ -224,7 +226,7 @@ patient_heatmaps_VAF <- longitudinal_heatmap(
   fusion_df = fusion_dfs$patient,
   hm_title = "Patient EWSR1/FLI1 fusion detections",
   type = "patient",
-  annotation = "VAF",
+  annot = "VAF",
   hm_cols = hm_cols
 )
 
@@ -251,7 +253,7 @@ dilution_heatmap_FP <- longitudinal_heatmap(
   fusion_df = fusion_dfs$dilution,
   hm_title = "Cell line EWSR1/FLI1 fusion detections",
   type = "dilution",
-  annotation = "false positives",
+  annot = "false positives",
   hm_cols = hm_cols
 )
 
@@ -269,7 +271,7 @@ dilution_heatmaps_VAF <- longitudinal_heatmap(
   fusion_df = fusion_dfs$dilution,
   hm_title = "Cell line EWSR1/FLI1 fusion detections",
   type = "dilution",
-  annotation = "VAF",
+  annot = "VAF",
   hm_cols = hm_cols
 )
 

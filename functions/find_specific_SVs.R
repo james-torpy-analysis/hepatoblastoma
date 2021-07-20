@@ -57,11 +57,7 @@ find_specific_SVs <- function(
   )
     
   # count ROI SVs:
-  if (all(length(all_SVs$true_positives$SVs) < 1)) {
-    all_SVs$true_positives$SV_nos <- GRanges(NULL)
-  } else {
-    all_SVs$true_positives$SV_nos <- length(all_SVs$true_positives$SVs)
-  }
+  all_SVs$true_positives$SV_nos <- length(all_SVs$true_positives$SVs)
 
   # identify false SVs:
   all_SVs$false_positives$SVs <- find_SVs(
@@ -71,11 +67,7 @@ find_specific_SVs <- function(
   )
   
   # count ROI SVs:
-  if (all(length(all_SVs$false_positives$SVs) < 1)) {
-    all_SVs$false_positives$SV_nos <- GRanges(NULL)
-  } else {
-    all_SVs$false_positives$SV_nos <- length(all_SVs$false_positives$SVs)
-  }
+  all_SVs$false_positives$SV_nos <- length(all_SVs$false_positives$SVs)
   
   return(all_SVs)
 

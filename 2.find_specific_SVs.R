@@ -3,11 +3,11 @@ args = commandArgs(trailingOnly=TRUE)
 
 projectname <- args[1]
 samplename <- args[2]
-#projectname <- "hepatoblastoma"
-#samplename <- "324_003_DB674_AGGCAGAA-CTCTCTAT_L001"
+# projectname <- "hepatoblastoma"
+# samplename <- "324_003_DB674_AGGCAGAA-CTCTCTAT_L001"
 
 home_dir <- "/share/ScratchGeneral/jamtor/"
-#home_dir <- "/Users/torpor/clusterHome/"
+# home_dir <- "/Users/torpor/clusterHome/"
 project_dir <- paste0(home_dir, "projects/", projectname, "/")
 in_dir <- paste0(project_dir, "results/svaba/BWA_and_picard/", samplename, "/")
 non_collapsed_dir <- paste0(project_dir, "results/svaba/non_collapsed/", samplename, "/")
@@ -37,7 +37,7 @@ if (!file.exists(paste0(Robject_dir, "detected_SVs.Rdata"))) {
   # define ROI co-ordinates:
   ROI <- GRanges(
     seqnames = "chr3",
-    ranges = IRanges(start = 41265552, end = 41266717), # region covered by primers
+    ranges = IRanges(start = 41265552, end = 41266752), # region covered by primers
     strand = "*"
   )
 

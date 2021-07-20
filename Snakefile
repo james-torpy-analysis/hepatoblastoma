@@ -38,28 +38,28 @@ VAF_dir = 'results/VAF_calculation/'
 R_dir = "/share/ClusterShare/thingamajigs/jamtor/local/lib/miniconda3/envs/snkenv/bin/"
 
 #SAMPLES = list([
-#    '324_001_DB674_TAAGGCGA-CTCTCTAT_L001', '324_003_DB674_AGGCAGAA-CTCTCTAT_L001'
+#    '324_003_DB674_AGGCAGAA-CTCTCTAT_L001'
 #])
 
 SAMPLES = list([
     '324_001_DB674_TAAGGCGA-CTCTCTAT_L001', '324_003_DB674_AGGCAGAA-CTCTCTAT_L001', 
     '324_021_1_D9HGF_CTCTCTAC-CTCTCTAT_L001', '324_022_D9HGF_CGAGGCTG-CTCTCTAT_L001', 
-    '324_025_D9HGF_GCTCATGA-CTCTCTAT_L001', '324_026_D9HGF_ATCTCAGG-CTCTCTAT_L001', 
+    '324_025_D9HGF_GCTCATGA-CTCTCTAT_L001', 
     '324_026_DCR52_ATCTCAGG-CTCTCTAT_L001', '324_027_D9HGF_TAAGGCGA-CTCTCTAT_L001', 
     '324_028_D9HGF_CGTACTAG-CTCTCTAT_L001', '324_029_D9YW9_AGGCAGAA-CTCTCTAT_L001', 
     '324_030_D9HGF_TCCTGAGC-CTCTCTAT_L001', '324_031_D9HGF_GGACTCCT-CTCTCTAT_L001', 
-    '324_032_D9HGF_TAGGCATG-CTCTCTAT_L001', '324_033_DB62M_CTCTCTAC-CTCTCTAT_L001', 
+    '324_032_D9HGF_TAGGCATG-CTCTCTAT_L001',  
     '324_033_DCR52_CTCTCTAC-CTCTCTAT_L001', '324_034_DB62M_CGAGGCTG-CTCTCTAT_L001', 
     '324_035_D9HGF_AAGAGGCA-CTCTCTAT_L001', '324_036_D9HGF_GTAGAGGA-CTCTCTAT_L001', 
     '324_037_D9HGF_AGGCAGAA-CTCTCTAT_L001', '324_039_D9YW9_CGTACTAG-CTCTCTAT_L001', 
     '324_040_D9YW9_TAGGCATG-CTCTCTAT_L001', '324_041_D9YW9_CTCTCTAC-CTCTCTAT_L001', 
     '324_042_D9YW9_CGAGGCTG-CTCTCTAT_L001', '324_043_D9YW9_AAGAGGCA-CTCTCTAT_L001', 
-    '324_044_D9YW9_GCTCATGA-CTCTCTAT_L001', '324_045_D9YW9_TAAGGCGA-CTCTCTAT_L001', 
+    '324_044_D9YW9_GCTCATGA-CTCTCTAT_L001', 
     '324_045_DCR52_TAAGGCGA-CTCTCTAT_L001', '324_046_D9YW9_GTAGAGGA-CTCTCTAT_L001', 
     '324_047_D9YW9_ATCTCAGG-CTCTCTAT_L001', '324_048_D9YWF_CGTACTAG-CTCTCTAT_L001', 
     '324_049_D9YWF_TCCTGAGC-CTCTCTAT_L001', '324_050_D9YWF_GGACTCCT-CTCTCTAT_L001', 
     '324_051_D9YWF_TAGGCATG-CTCTCTAT_L001', '324_052_D9YWF_CTCTCTAC-CTCTCTAT_L001', 
-    '324_053_D9YWF_CGAGGCTG-CTCTCTAT_L001', '324_053_DCR52_CGAGGCTG-CTCTCTAT_L001', 
+    '324_053_DCR52_CGAGGCTG-CTCTCTAT_L001', 
     '324_054_D9YWF_AAGAGGCA-CTCTCTAT_L001', '324_055_D9YWF_GCTCATGA-CTCTCTAT_L001', 
     '324_056_D9YWF_TAAGGCGA-CTCTCTAT_L001', '324_057_DB674_CGTACTAG-CTCTCTAT_L001', 
     '324_058_DB674_TCCTGAGC-CTCTCTAT_L001', '324_059_DB674_GGACTCCT-CTCTCTAT_L001', 
@@ -95,26 +95,19 @@ SAMPLES = list([
 #            sample = SAMPLES
 #        )
 
-#rule all:
-#    input:
-#        expand(
-#            SV_dir + '{sample}/detected_SVs.Rdata',
-#            sample = SAMPLES
-#        )
-
-#rule all:
-#    input:
-#        expand(
-#            VAF_dir + '{sample}/max_supps_allowed_{supps_allowed}/Rdata/VAF_calculation_reads.Rdata',
-#            sample = SAMPLES, supps_allowed = supps_allowed
-#        )
-
 rule all:
     input:
         expand(
-            VAF_dir + '{sample}/max_supps_allowed_{supps_allowed}/VAFs.txt',
-            sample = SAMPLES, supps_allowed = supps_allowed
+            SV_dir + '{sample}/detected_SVs.Rdata',
+            sample = SAMPLES
         )
+
+#rule all:
+#    input:
+#        expand(
+#            VVAF_dir + '{sample}/non_specific_SV_supporting_reads.tsv',
+#            sample = SAMPLES
+#        )
 
 
 ######################################################################################################
@@ -128,7 +121,7 @@ rule BWA_and_umi_collapse:
     output:
         bam = align_dir + '{sample}/{sample}.consensus.bam',
         bai = align_dir + '{sample}/{sample}.consensus.bam.bai',
-    threads: 7
+    threads: 8
     shell:
         'mkdir -p logs/BWA_and_picard; ' +
         'cd logs/BWA_and_picard; ' + 
@@ -150,7 +143,7 @@ rule svaba:
    output:
        filt = svaba_dir + '{sample}/{sample}.svaba.sv.vcf',
        unfilt = svaba_dir + '{sample}/{sample}.svaba.unfiltered.sv.vcf'
-   threads: 7
+   threads: 8
    shell:
        'mkdir -p logs/svaba; ' + 
         'cd logs/svaba; ' + 
@@ -220,7 +213,7 @@ rule find_specific_SVs:
         unfilt = svaba_dir + '{sample}/{sample}.svaba.semifiltered.sv.formatted.vcf.idx'
     output:
         SV_dir + '{sample}/detected_SVs.Rdata'
-    threads: 7
+    threads: 8
     shell:
         "mkdir -p logs/find_SVs/{wildcards.sample}/; " + 
         "cd logs/find_SVs/{wildcards.sample}/; " +
@@ -232,38 +225,14 @@ rule find_specific_SVs:
 
 
 ######################################################################################################
-### 5. Filter bams ###
-######################################################################################################
-
-rule filter_bams:
-    input:
-        SV_dir + '{sample}/detected_SVs.Rdata'
-    output:
-        VAF_dir + '{sample}/max_supps_allowed_{supps_allowed}/Rdata/VAF_calculation_reads.Rdata'
-    threads: 8
-    shell:
-        "mkdir -p logs/filter_bams/{wildcards.sample}/; " + 
-        "cd logs/filter_bams/{wildcards.sample}/; " + 
-        "{R_dir}/R CMD BATCH  --no-save '--args" + 
-        " {project_name}" + 
-        " {wildcards.sample}" + 
-        " {chromosomes}" + 
-        " {ROI}" + 
-        " {supps_allowed}" + 
-        " {SV_type}" + 
-        "' ../../../scripts/3.filter_bams.R"
-
-
-######################################################################################################
-### 6. Calculate VAFs ###
+### 5. Calculate VAFs ###
 ######################################################################################################
 
 rule calc_VAFs:
     input:
-        VAF_dir + '{sample}/max_supps_allowed_{supps_allowed}/Rdata/VAF_calculation_reads.Rdata'
+        SV_dir + '{sample}/detected_SVs.Rdata'
     output:
-        VAF = VAF_dir + '{sample}/max_supps_allowed_{supps_allowed}/VAFs.txt',
-        read_no = VAF_dir + '{sample}/max_supps_allowed_{supps_allowed}/final_SV_read_nos.txt'
+        VAF_dir + '{sample}/Rdata/VAFs.Rdata'
     threads: 8
     shell:
         "mkdir -p logs/VAF_calculation/{wildcards.sample}/; " + 
@@ -271,12 +240,26 @@ rule calc_VAFs:
         "{R_dir}/R CMD BATCH  --no-save '--args" + 
         " {project_name}" + 
         " {wildcards.sample}" + 
-        " {chromosomes}" + 
-        " {supps_allowed}" + 
-        " {SV_type}" + 
-        " {min_overlap}" + 
-        " {disc_read_window}" + 
-        " {same_SV_window}" +
-        "' ../../../scripts/4.calculate_VAFs.R"
+        "' ../../../scripts/3.vaf.R"
 
+
+######################################################################################################
+### 6. Find supporting reads ###
+######################################################################################################
+
+rule find_supp:
+    input:
+        VAF_dir + '{sample}/Rdata/VAFs.Rdata'
+    output:
+        VAF_dir + '{sample}/non_specific_SV_supporting_reads.tsv'
+    threads: 8
+    shell:
+        "mkdir -p logs/find_supp/{wildcards.sample}/; " + 
+        "cd logs/find_supp/{wildcards.sample}/; " +
+        "{R_dir}/R CMD BATCH  --no-save '--args" + 
+        " {project_name}" + 
+        " {wildcards.sample}" + 
+        " 19" + # min overlapp required for read 1 to be counted as supporting
+        " 19" + # min overlapp required for read 2 to be counted as supporting
+        "' ../../../scripts/4.find_supporting_reads.R"
 
