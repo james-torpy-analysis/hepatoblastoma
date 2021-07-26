@@ -38,7 +38,10 @@ VAF_dir = 'results/VAF_calculation/'
 R_dir = "/share/ClusterShare/thingamajigs/jamtor/local/lib/miniconda3/envs/snkenv/bin/"
 
 #SAMPLES = list([
-#    '324_003_DB674_AGGCAGAA-CTCTCTAT_L001'
+#    '324_003_DB674_AGGCAGAA-CTCTCTAT_L001', '324_057_DB674_CGTACTAG-CTCTCTAT_L001',
+#    '324_058_DB674_TCCTGAGC-CTCTCTAT_L001', '324_059_DB674_GGACTCCT-CTCTCTAT_L001',
+#    '324_060_DB674_TAGGCATG-CTCTCTAT_L001', '324_061_DB674_CTCTCTAC-CTCTCTAT_L001',
+#    '324_062_DB674_CGAGGCTG-CTCTCTAT_L001', '324_063_DB674_AAGAGGCA-CTCTCTAT_L001'
 #])
 
 SAMPLES = list([
@@ -95,19 +98,19 @@ SAMPLES = list([
 #            sample = SAMPLES
 #        )
 
-rule all:
-    input:
-        expand(
-            SV_dir + '{sample}/detected_SVs.Rdata',
-            sample = SAMPLES
-        )
-
 #rule all:
 #    input:
 #        expand(
-#            VVAF_dir + '{sample}/non_specific_SV_supporting_reads.tsv',
+#            SV_dir + '{sample}/detected_SVs.Rdata',
 #            sample = SAMPLES
 #        )
+
+rule all:
+    input:
+        expand(
+            VAF_dir + '{sample}/Rdata/VAFs.Rdata',
+            sample = SAMPLES
+        )
 
 
 ######################################################################################################
