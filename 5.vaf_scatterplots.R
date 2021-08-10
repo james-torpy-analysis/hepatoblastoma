@@ -46,17 +46,18 @@ patient_VAFs <- merge(patient_meta, SV_VAFs, by=0, all = FALSE)
 ####################################################################################
 
 comparison_df <- subset(
-  patient_VAFs, select = c(Patient, Condition, ddPCR_VAF, Andre_VAF, SV_VAF))
+  patient_VAFs, select = c(Patient, Condition, ddPCR_VAF, NGS_VAF, Andre_VAF, SV_VAF))
 
 # check distributions:
 plot(hist(comparison_df$ddPCR_VAF[comparison_df$ddPCR_VAF != 0]))
+plot(hist(comparison_df$ddPCR_VAF[comparison_df$NGS_VAF != 0]))
 plot(hist(comparison_df$Andre_VAF[comparison_df$Andre_VAF != 0]))
 plot(hist(comparison_df$Andre_VAF[comparison_df$SV_VAF != 0]))
 
 # loop through to plot each comparison:
 l=1
-for (i in 3:5) {
-  for (j in 3:5) {
+for (i in 3:6) {
+  for (j in 3:6) {
     
     if (i != j) {
       
@@ -69,6 +70,13 @@ for (i in 3:5) {
       plot_df <- comparison_df
       colnames(plot_df)[i] <- "var1"
       colnames(plot_df)[j] <- "var2"
+      
+      # remove rows with NA:
+      plot_df <- plot_df[!is.na(plot_df$var1) & !is.na(plot_df$var2),]
+      
+      # remove labels of samples with both values < 5:
+      plot_df$label <- plot_df$Patient
+      plot_df$label[plot_df$var1 < 2 & plot_df$var2 < 2] <- ""
       
       # # calculate correlation:
       # corr <- cor.test(
@@ -88,7 +96,8 @@ for (i in 3:5) {
       p <- p + ylim(c(0, 50))
       p <- p + xlab(colnames(comparison_df)[i])
       p <- p + ylab(colnames(comparison_df)[j])
-      p <- p + geom_text_repel(data=plot_df, aes(label=Patient))
+      p <- p + geom_text_repel(
+        data=plot_df, aes(label=label), max.overlaps = nrow(plot_df))
       # p <- p + geom_abline(
       #   intercept = coeff[1], slope = coeff[2], color = "red")
       # p <- p + annotate(
@@ -129,7 +138,15 @@ for (i in 3:5) {
 }
 
 # plot:
-png(paste0(plot_dir, "ddPCR_vs_Andre_VAF.png"),
+png(paste0(plot_dir, "NGS_vs_ddPCR_VAF.png"),
+    height = 3.5,
+    width = 5,
+    res = 300,
+    units = "in")
+print(cor_plots$ddPCR_VAF_vs_NGS_VAF)
+dev.off()
+
+png(paste0(plot_dir, "Andre_vs_ddPCR_VAF.png"),
     height = 3.5,
     width = 5,
     res = 300,
@@ -142,7 +159,15 @@ png(paste0(plot_dir, "SV_vs_ddPCR_VAF.png"),
     width = 5,
     res = 300,
     units = "in")
-print(cor_plots$SV_VAF_vs_ddPCR_VAF)
+print(cor_plots$ddPCR_VAF_vs_SV_VAF)
+dev.off()
+
+png(paste0(plot_dir, "SV_vs_NGS_VAF.png"),
+    height = 3.5,
+    width = 5,
+    res = 300,
+    units = "in")
+print(cor_plots$NGS_VAF_vs_SV_VAF)
 dev.off()
 
 png(paste0(plot_dir, "SV_vs_Andre_VAF.png"),
@@ -150,126 +175,7 @@ png(paste0(plot_dir, "SV_vs_Andre_VAF.png"),
     width = 5,
     res = 300,
     units = "in")
-print(cor_plots$SV_VAF_vs_Andre_VAF)
+print(cor_plots$Andre_VAF_vs_SV_VAF)
 dev.off()
-
-
-####################################################################################
-### 2. Plot SV vs GeneGlobe SNP VAFs ###
-####################################################################################
-
-# plot SV vs TP53 VAFs, leaving out samples with either = 0 or unknown:
-SV_vs_SM_TP53 <- subset(
-  patient_VAFs, select = c(SM_TP53_VAF, SV_VAF, Treatment, Patient)
-)
-
-SV_vs_SM_TP53 <- SV_vs_SM_TP53[
-  SV_vs_SM_TP53$SM_TP53_VAF != 0 & 
-    SV_vs_SM_TP53$SV_VAF != 0 &
-    SV_vs_SM_TP53$SM_TP53_VAF != "unknown" & 
-    SV_vs_SM_TP53$SV_VAF != "unknown",
-]
-
-# calculate correlation between SV and TP53 VAFs:
-plot(hist(SV_vs_SM_TP53$SV_VAF))
-plot(hist(SV_vs_SM_TP53$SM_TP53_VAF))
-dev.off()
-
-corr <- cor.test(
-  x = SV_vs_SM_TP53$SM_TP53_VAF, 
-  y = SV_vs_SM_TP53$SV_VAF,
-  method = "pearson"
-)
-
-# Fit regression line
-require(stats)
-reg <- lm(SM_TP53_VAF ~ SV_VAF, data = SV_vs_SM_TP53)
-coeff=coefficients(reg)
-
-p <- ggplot(
-  SV_vs_SM_TP53, 
-  aes(x = SV_VAF, y = SM_TP53_VAF, color = Treatment)
-)
-p <- p + geom_point(size = 3)
-p <- p + theme_cowplot(12)
-p <- p + ylim(c(0, 100))
-p <- p + xlim(c(0, 100))
-p <- p + ylab("smCounter2 TP53 VAF")
-p <- p + xlab("SV VAF")
-p <- p + geom_text_repel(data=SV_vs_SM_TP53, aes(label=Patient))
-p <- p + annotate(
-  "text", x = 80, y = 85, 
-  label = paste0(
-    "R2=", round(corr$estimate, 2), ", p=", round(corr$p.value, 3)
-  ), color='red', size = 4
-)
-p <- p + geom_abline(intercept = coeff[1], slope = coeff[2], color = "red")
-
-png(paste0(plot_dir, "SV_vs_SM_TP53_VAFs.png"),
-  height = 3.5,
-  width = 5,
-  res = 300,
-  units = "in")
-  print(p)
-dev.off()
-
-# plot SV vs STAG2 VAFs, leaving out samples with either = 0 or unknown:
-SV_vs_SM_STAG2 <- subset(
-  patient_VAFs, select = c(SM_STAG2_VAF, SV_VAF, Treatment, Patient)
-)
-
-SV_vs_SM_STAG2 <- SV_vs_SM_STAG2[
-  SV_vs_SM_STAG2$SM_STAG2_VAF != 0 & 
-    SV_vs_SM_STAG2$SV_VAF != 0 &
-    SV_vs_SM_STAG2$SM_STAG2_VAF != "unknown" & 
-    SV_vs_SM_STAG2$SV_VAF != "unknown",
-]
-# calculate correlation between SV and STAG2 VAFs:
-plot(hist(SV_vs_SM_STAG2$SV_VAF))
-plot(hist(SV_vs_SM_STAG2$SM_STAG2_VAF))
-dev.off()
-
-corr <- cor.test(
-  x = SV_vs_SM_STAG2$SM_STAG2_VAF, 
-  y = SV_vs_SM_STAG2$SV_VAF,
-  method = "pearson"
-)
-
-# Fit regression line
-require(stats)
-reg <- lm(SM_STAG2_VAF ~ SV_VAF, data = SV_vs_SM_STAG2)
-coeff=coefficients(reg)
-
-p <- ggplot(
-  SV_vs_SM_STAG2, 
-  aes(x = SV_VAF, y = SM_STAG2_VAF, color = Treatment)
-)
-p <- p + geom_point(size = 3)
-p <- p + theme_cowplot(12)
-p <- p + ylim(c(0, 100))
-p <- p + xlim(c(0, 100))
-p <- p + ylab("smCounter2 STAG2 VAF")
-p <- p + xlab("SV VAF")
-p <- p + geom_text_repel(data=SV_vs_SM_STAG2, aes(label=Patient))
-p <- p + annotate(
-  "text", x = 80, y = 85, 
-  label = paste0(
-    "R2=", round(corr$estimate, 2), ", p=", round(corr$p.value, 3)
-  ), color='red', size = 4
-)
-p <- p + geom_abline(intercept = coeff[1], slope = coeff[2], color = "red")
-
-png(paste0(plot_dir, "SV_vs_SM_STAG2_VAFs.png"),
-    height = 3.5,
-    width = 5,
-    res = 300,
-    units = "in")
-print(p)
-dev.off()
-
-
-####################################################################################
-### 3. Plot SV vs smcounter2 SNP VAFs ###
-####################################################################################
 
 

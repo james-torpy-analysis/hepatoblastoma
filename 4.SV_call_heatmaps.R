@@ -88,7 +88,7 @@ dilution_df <- read.table(
 dilution_df$Sample <- simplify_id(dilution_df$Sample, divider = "-")
 
 # define sample names:
-samplenames <- as.list(list.files(VAF_dir, pattern = project_id))
+samplenames <- list.files(VAF_dir, pattern = project_id)
 
 # fetch SV numbers:
 SV_nos <- fetch_SV_no(
@@ -113,37 +113,35 @@ for (i in 1:length(SV_nos)) {
 
 # fetch VAFs with most supporting reads for each sample, 
 # prioritising high conf:
-VAFs <- unlist(
-  lapply(samplenames, function(x) {
+VAFs <- sapply(samplenames, function(x) {
     
-    print(x)
+  print(x)
+  
+  all_VAFs <- tryCatch(
+    all_VAFs <- readRDS(paste0(VAF_dir, x, "/Rdata/VAFs.Rdata")),
+    error=function(err) NA
+  )
+  
+  if (suppressWarnings(!is.na(all_VAFs))) {
     
-    all_VAFs <- tryCatch(
-      all_VAFs <- readRDS(paste0(VAF_dir, x, "/Rdata/VAFs.Rdata")),
-      error=function(err) NA
-    )
-    
-    if (suppressWarnings(!is.na(all_VAFs))) {
-      
-      # prioritise high confidence VAFs:
-      if ("high" %in% all_VAFs$conf) {
-        temp_VAFs <- all_VAFs[all_VAFs$conf == "high",]
-      } else {
-        temp_VAFs <- all_VAFs
-      }
-      return(round(max(temp_VAFs$VAF)*100, 1))
-    
+    # prioritise high confidence VAFs:
+    if ("high" %in% all_VAFs$conf) {
+      temp_VAFs <- all_VAFs[all_VAFs$conf == "high",]
     } else {
-      return(0)
+      temp_VAFs <- all_VAFs
     }
-    
-  })
-)
+    return(round(max(temp_VAFs$VAF)*100, 1))
+  
+  } else {
+    return(0)
+  }
+  
+})
 
 VAF_df <- data.frame(
   VAF = VAFs
 )
-VAF_df$Sample <- simplify_id(unlist(samplenames), divider = "_")
+VAF_df$Sample <- simplify_id(rownames(VAF_df), divider = "_")
 
 # merge VAFs with SV df:
 SV_dfs <- lapply(SV_dfs, function(x) {

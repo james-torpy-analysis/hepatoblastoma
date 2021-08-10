@@ -4,7 +4,7 @@ args = commandArgs(trailingOnly=TRUE)
 projectname <- args[1]
 samplename <- args[2]
 # projectname <- "hepatoblastoma"
-# samplename <- "324_057_DB674_CGTACTAG-CTCTCTAT_L001"
+# samplename <- "324_022_D9HGF_CGAGGCTG-CTCTCTAT_L001"
 
 home_dir <- "/share/ScratchGeneral/jamtor/"
 #home_dir <- "/Users/torpor/clusterHome/"
@@ -125,8 +125,6 @@ if (length(SVs) >= 1) {
   
   for (i in seq_along(SVs)) {
     
-    print(i)
-    
     SV <- SVs[i]
     
     # calculate length of deletion, to use as read windows:
@@ -164,6 +162,9 @@ if (length(SVs) >= 1) {
     supp_fwd <- intersect(
       names(which(sum(width(pintersect(R1, gene_a_upstream))) >= min_overlap_R1)),
       names(which(sum(width(pintersect(R2, gene_b_dnstream_rev))) >= min_overlap_R2)))
+    
+    # ensure no non-supporting reads are classed as supporting:
+    supp_fwd <- supp_fwd[!(supp_fwd %in% nonsupp_fwd)]
     
     ## diagnost plots for overlap
     R1_nonsupp_fwd <- R1[which(names(R1) %in% nonsupp_fwd)]
