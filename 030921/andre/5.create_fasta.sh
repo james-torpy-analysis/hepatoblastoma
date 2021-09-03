@@ -6,7 +6,7 @@ out_dir="$result_dir/fasta"
 
 mkdir -p $out_dir
 
-for inF in $result_dir/no_barcode/*/*R1*.fastq.gz; do
+for inF in $result_dir/no_barcode/*R1*.fastq.gz; do
 
   cSample=$(basename $inF | cut -d "_" -f 2)
   echo $cSample

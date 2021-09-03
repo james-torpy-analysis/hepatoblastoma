@@ -8,6 +8,7 @@ import pyfastx
 import gzip
 from itertools import islice
 import regex
+import os
 import errno
 
 read2_ptn='ATTGGAGTCCT'
@@ -15,7 +16,8 @@ read1_ptn='AGGACTCCAAT' # if insert is small this barcode can be sequenced into:
 read1_ptn_=regex.compile("("+read1_ptn+"){s<=1}")   # s<=1 allow one mismatch, e<=1 also allow indel
 read2_ptn_len=len(read2_ptn)
 
-inArr=glob.glob(in_dir + '/*/*_R1*.fastq.gz', recursive=False); force_ptn2=True; outFolder='no_barcode'
+inArr=glob.glob(in_dir + '/*_R1*.fastq.gz', recursive=False); force_ptn2=True; outFolder='no_barcode'
+inArr=inArr[0:1]
 
 def fastq(fname1, fname2):  
   fh1=gzip.open(fname1, 'rb')
@@ -47,7 +49,6 @@ def get_match_count(_seq2):
   return match_c
 
 for i, in1 in enumerate(inArr):
-  #in1='/g/data/gd7/research/andmin/Hepatoblastmoma/trimmed/324_001_DB674_TAAGGCGA-CTCTCTAT_L001_R1.tr.fastq.gz'
   print(' {}/{} {} '.format(i+1, len(inArr), in1 )) 
   in2=in1.replace('_R1','_R2')
   out1n=in1.replace('trimmed','trimmed/'+outFolder)

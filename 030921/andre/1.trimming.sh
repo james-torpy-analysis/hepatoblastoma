@@ -14,13 +14,13 @@ for inF in $raw_dir/*/*R1*fastq.gz; do
   
   ls $raw_dir/$cID/$cFile $raw_dir/$cID/$cFile2
   
-  f1out=$result_dir/$cID/$(basename $cFile | sed "s/.fastq.gz//")
-  f2out=$result_dir/$cID/$(basename $cFile2 | sed "s/.fastq.gz//")
+  f1out=$result_dir/$(basename $cFile | sed "s/.fastq.gz//")
+  f2out=$result_dir/$(basename $cFile2 | sed "s/.fastq.gz//")
 
-  mkdir -p $result_dir/$cID
+  mkdir -p $result_dir
   
   singularity run \
-    -B $result_dir/$cID:$result_dir/$cID \
+    -B $result_dir:$result_dir \
     -B $raw_dir/$cID:$raw_dir/$cID \
     ${imagename} cutadapt \
     -j 4 \
