@@ -3,7 +3,7 @@
 source ~/.bashrc
 
 sample_name=$1
-#sample_name="324_025_D9HGF_GCTCATGA-CTCTCTAT_L001"
+#sample_name="324_057_DB674_CGTACTAG-CTCTCTAT_L001"
 
 printf "\n\n"
 echo "project name is hepatoblastoma"
@@ -55,7 +55,7 @@ fi;
 ### 2. Collapse bam using Picard MarkDuplicates ###
 ##################################################################################################################################
 
-if [ ! -f $bam_dir/$sample_name.dedup.sorted.by.coord.bam.bai ]; then
+if ! ( [ -f $bam_dir/$sample_name.dedup.sorted.by.coord.bam.bai ] && [ -f $bam_dir/$sample_name.dedup.sorted.by.coord.bam ] ); then
 
   printf "\n\n"
   echo "--------------------------------------------------"
