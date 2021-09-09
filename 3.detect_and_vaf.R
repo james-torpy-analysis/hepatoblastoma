@@ -3,11 +3,14 @@ args = commandArgs(trailingOnly=TRUE)
 
 projectname <- args[1]
 samplename <- args[2]
-min_bp_coverage <- args[3]
+min_bp_coverage <- as.numeric(args[3])
+min_overlap <- as.numeric(args[4])
+min_supporting <- as.numeric(args[5])
 #projectname <- "hepatoblastoma"
-#samplename <- "324_056_D9YWF_TAAGGCGA-CTCTCTAT_L001"
+#samplename <- "324_040_D9YW9_TAGGCATG-CTCTCTAT_L001"
 #min_bp_coverage <- 20
-
+#min_overlap <- 19
+#min_supporting <- 2
 
 home_dir <- "/share/ScratchGeneral/jamtor/"
 project_dir <- paste0(home_dir, "projects/", projectname, "/")
@@ -33,14 +36,10 @@ library(scales)
 
 source(paste0(func_dir, "vaf_functions.R"))
 
-min_overlap_R1 <- 19
-min_overlap_R2 <- 19
-
 CTNNB1_gr <- GRanges(
   seqname = "chr3",
   ranges = IRanges(start = 41199422, end = 41240445),
-  strand = "*"
-)
+  strand = "*" )
 
 
 ## 1) read bam file
@@ -154,26 +153,31 @@ if (length(split_gr) > 0) {
   deletion_starts <- GRanges(
     seqnames = seqnames(deletions),
     ranges = IRanges(start = start(deletions), width = 1),
-    strand = "*"
+    strand = "+"
   )
   deletion_ends <- GRanges(
     seqnames = seqnames(deletions),
     ranges = IRanges(start = end(deletions), width = 1),
-    strand = "*"
+    strand = "-"
   )
   
   
   ## 3) calculate VAFs for all deletions
   
+  split_primary <- split_gr[split_gr$flag < 2000]
+  non_split_primary <- non_split_gr[non_split_gr$flag < 2000]
+
   # isolate read 2 in forward orientation for upstream breakpoint coords, 
   # as it contains gene-speific primer:
-  fwd_split <- split_gr[split_gr$R2 & strand(split_gr) == "+"]
-  fwd_non_split <- non_split_gr[non_split_gr$R2 & strand(non_split_gr) == "+"]
+  fwd_split_R1 <- split_gr[split_gr$R1 & strand(split_gr) == "+"]
+  fwd_split_R2 <- split_primary[split_primary$R2 & strand(split_primary) == "+"]
+  fwd_non_split <- non_split_primary[non_split_primary$R2 & strand(non_split_primary) == "+"]
   
   # isolate read 2 in reverse orientation for downstream breakpoint coords, 
   # as it contains gene-speific primer:
-  rev_split <- split_gr[split_gr$R2 & strand(split_gr) == "-"]
-  rev_non_split <- non_split_gr[non_split_gr$R2 & strand(non_split_gr) == "-"]
+  rev_split_R1 <- split_gr[split_gr$R1 & strand(split_gr) == "-"]
+  rev_split_R2 <- split_primary[split_primary$R2 & strand(split_primary) == "-"]
+  rev_non_split <- non_split_primary[non_split_primary$R2 & strand(non_split_primary) == "-"]
   
   deletions$upstream_supporting <- NA
   deletions$upstream_non_supporting <- NA
@@ -184,24 +188,55 @@ if (length(split_gr) > 0) {
   deletions$combined_VAF <- NA
   
   for (i in seq_along(deletions)) {
-  
-    # fetch qnames of split reads which overlap either breakpoint coord of 
+
+    # fetch qnames of split R2s which overlap either breakpoint coord of 
     # deletion:
     supporting_reads <- list(
-      upstream = pintersect(fwd_split, deletion_starts[i]), 
-      downstream = pintersect(rev_split, deletion_ends[i]) )
-    supporting_reads <- lapply(supporting_reads, function(x) {
-      unique(x$qname[x$hit])
-    })
+      upstream = fwd_split_R2$qname[
+        which(width(pintersect(fwd_split_R2, deletion_starts[i]+min_overlap)) >= 
+          min_overlap ) ], 
+      downstream = rev_split_R2$qname[
+        which(width(pintersect(rev_split_R2, deletion_ends[i]+min_overlap)) >= 
+          min_overlap ) ] )
+
+    # define 1 mb downstream of deletion end and upstream of deletion start:
+    end_dnstream <- flank(deletion_ends[i], 1e6, start = TRUE)
+    end_dnstream <- resize(end_dnstream, 1e6 + 1) ## add breakpoint position
+    start_upstream <- flank(deletion_starts[i], 1e6, start = TRUE)
+    start_upstream <- resize(start_upstream, 1e6 + 1) ## add breakpoint position
+    
+    # fetch qnames of R1s lying downstream of downstream bp, 
+    # or upstream of upstream bp:
+    R1_dnstream <- rev_split_R1$qname[
+      which(width(pintersect(rev_split_R1, end_dnstream)) >= min_overlap) ]
+    R1_upstream <- fwd_split_R1$qname[
+      which(width(pintersect(fwd_split_R1, start_upstream)) >= min_overlap) ]
+
+    # keep upstream supporting reads with R1 downstream of deletion, or
+    # downstream supporting reads with R1 upstream of deletion:
+    supporting_reads$upstream <- supporting_reads$upstream[
+      supporting_reads$upstream %in% R1_dnstream ]
+    supporting_reads$downstream <- supporting_reads$downstream[
+      supporting_reads$downstream %in% R1_upstream ]
   
     # fetch qnames of non-split reads which overlap either breakpoint coord of 
     # deletion:
     non_supporting_reads <- list(
-      upstream = pintersect(fwd_non_split, deletion_starts[i]), 
-      downstream = pintersect(rev_non_split, deletion_ends[i]) )
-    non_supporting_reads <- lapply(non_supporting_reads, function(x) {
-      unique(x$qname[x$hit])
-    })
+      upstream = fwd_non_split$qname[
+        which(width(pintersect(fwd_non_split, deletion_starts[i]+min_overlap)) >= 
+          min_overlap ) ], 
+      downstream = rev_non_split$qname[
+        which(width(pintersect(rev_non_split, deletion_ends[i]+min_overlap)) >= 
+          min_overlap ) ] )
+
+    # store for bams:
+    if (i==1) {
+      all_supporting <- list(supporting_reads)
+      all_non_supporting <- list(non_supporting_reads)
+    } else {
+      all_supporting[[i]] <- supporting_reads
+      all_non_supporting[[i]] <- non_supporting_reads
+    }
   
     # fill in numbers:
     deletions$upstream_supporting[i] <- length(supporting_reads$upstream)
@@ -228,6 +263,7 @@ if (length(split_gr) > 0) {
       downstream_VAF, combined_VAF ) )
   colnames(upstream_VAFs) <- gsub("upstream_", "", colnames(upstream_VAFs))
   upstream_VAFs$type <- "upstream"
+  upstream_VAFs$ind <- seq_along(upstream_VAFs$VAF)
 
   downstream_VAFs <- subset(
     as.data.frame(deletions), 
@@ -235,29 +271,66 @@ if (length(split_gr) > 0) {
       upstream_VAF, combined_VAF ) )
   colnames(downstream_VAFs) <- gsub("downstream_", "", colnames(downstream_VAFs))
   downstream_VAFs$type <- "downstream"
+  downstream_VAFs$ind <- seq_along(downstream_VAFs$VAF)
 
   both_VAFs <- rbind(upstream_VAFs, downstream_VAFs)
 
-  # remove entires with less than min_bp_coverage total reads:
+  # remove VAFs with less than min_bp_coverage total reads:
   filtered_VAFs <- both_VAFs[
     both_VAFs$supporting + both_VAFs$non_supporting >= min_bp_coverage, ]
+  # remove VAFs with less than min no supporting reads required:
+  filtered_VAFs <- filtered_VAFs[filtered_VAFs$supporting >= min_supporting, ]
+
   # keep VAF with max supporting reads:
-  selected_VAF <- filtered_VAFs[
+  if (nrow(filtered_VAFs) > 0) {
+    selected_VAF <- filtered_VAFs[
     filtered_VAFs$supporting == max(filtered_VAFs$supporting), ]
 
-  colnames(selected_VAF) <- gsub("upstream_", "", colnames(selected_VAF))
-  colnames(selected_VAF) <- gsub("downstream_", "", colnames(selected_VAF))
-  selected_VAF <- selected_VAF[which.max(selected_VAF$VAF),]
+    colnames(selected_VAF) <- gsub("upstream_", "", colnames(selected_VAF))
+    colnames(selected_VAF) <- gsub("downstream_", "", colnames(selected_VAF))
+    selected_VAF <- selected_VAF[which.max(selected_VAF$VAF),]
+
+    # keep and save deletions and VAFs:
+    saveRDS(selected_VAF, paste0(Robject_dir, "selected_VAF.rds"))
+    write.table(
+      as.data.frame(selected_VAF),
+      paste0(table_dir, "selected_VAF.txt"),
+      row.names = FALSE,
+      col.names = TRUE,
+      quote = FALSE,
+      sep = "\t" )
+
+    # write selected upstream bp supporting and non_supporting reads to SAMs:
+    selected_supporting <- all_supporting[[selected_VAF$ind]][
+      names(all_supporting[[selected_VAF$ind]]) == "upstream" ]
+    selected_non_supporting <- all_non_supporting[[selected_VAF$ind]][
+      names(all_non_supporting[[selected_VAF$ind]]) == "upstream" ]
   
-  # keep and save deletions and VAFs:
-  saveRDS(selected_VAF, paste0(Robject_dir, "selected_VAF.rds"))
-  write.table(
-    as.data.frame(selected_VAF),
-    paste0(table_dir, "selected_VAF.txt"),
-    row.names = FALSE,
-    col.names = TRUE,
-    quote = FALSE,
-    sep = "\t" )
+    writeSam(file_bam, unlist(selected_supporting), 
+      paste0(out_bam_dir, "upstream_deletion_bp_", selected_VAF$start, "_", 
+        selected_VAF$end, "_supporting_reads.sam") )
+    writeSam(file_bam, unlist(selected_non_supporting), 
+      paste0(out_bam_dir, "upstream_deletion_bp_", selected_VAF$start, "_", 
+        selected_VAF$end, "_non_supporting_reads.sam") )
+    
+    # write selected downstream bp supporting and non_supporting reads to SAMs:
+    selected_supporting <- all_supporting[[selected_VAF$ind]][
+      names(all_supporting[[selected_VAF$ind]]) == "downstream" ]
+    selected_non_supporting <- all_non_supporting[[selected_VAF$ind]][
+      names(all_non_supporting[[selected_VAF$ind]]) == "downstream" ]
+  
+    writeSam(file_bam, unlist(selected_supporting), 
+      paste0(out_bam_dir, "downstream_deletion_bp_", selected_VAF$start, "_", 
+        selected_VAF$end, "_supporting_reads.sam") )
+    writeSam(file_bam, unlist(selected_non_supporting), 
+      paste0(out_bam_dir, "downstream_deletion_bp_", selected_VAF$start, "_", 
+        selected_VAF$end, "_non_supporting_reads.sam") )
+
+  } else {
+     # create output file for snakemake:
+    selected_VAF <- NULL
+    saveRDS(selected_VAF, paste0(Robject_dir, "selected_VAF.rds"))
+  }
   
   saveRDS(deletions, paste0(Robject_dir, "deletion_VAFs.rds"))
   write.table(

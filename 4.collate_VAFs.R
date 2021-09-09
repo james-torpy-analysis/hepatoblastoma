@@ -1,4 +1,5 @@
 projectname <- "hepatoblastoma"
+new_detections <- c("324_052")
 
 #home_dir <- "/share/ScratchGeneral/jamtor/"
 home_dir <- "/Users/torpor/clusterHome/"
@@ -71,8 +72,14 @@ plot(hist(all_VAFs$Andre[all_VAFs$Andre != 0]))
 plot(hist(all_VAFs$new_VAF[all_VAFs$new_VAF != 0]))
 dev.off()
 
+
+####################################################################################
+### 3. Plot VAF correlations ###
+####################################################################################
+
+
 # function to create VAF correlation plots:
-compare_VAF <- function(VAF_df, lab1, lab2, cortype = "kendall" ) {
+compare_VAF <- function(VAF_df, lab1, lab2, lim = 40, cortype = "kendall") {
   # calculate correlation between ddPCR and Andre VAFs:
   corr <- cor.test(x = VAF_df$VAF1, y = VAF_df$VAF2, method = cortype )
   
@@ -85,12 +92,12 @@ compare_VAF <- function(VAF_df, lab1, lab2, cortype = "kendall" ) {
     VAF_df, aes(x = VAF1, y = VAF2, color = treatment) )
   p <- p + geom_point()
   p <- p + theme_cowplot(12)
-  p <- p + xlim(c(0, 50))
-  p <- p + ylim(c(0, 50))
+  p <- p + xlim(c(0, lim))
+  p <- p + ylim(c(0, lim))
   p <- p + xlab(paste0(lab1, " VAF"))
   p <- p + ylab(paste0(lab2, " VAF"))
   p <- p + geom_text_repel(data=VAF_df, aes(label=id))
-  p <- p + annotate("text", x = 30, y = 45, label = paste0(
+  p <- p + annotate("text", x = lim-5, y = lim-5, label = paste0(
     "R2=", round(corr$estimate, 2), ", p=", round(corr$p.value, 6) ), 
     color='red', size = 4 )
   p <- p + geom_abline(intercept = coeff[1], slope = coeff[2], color = "red")
@@ -101,7 +108,7 @@ compare_VAF <- function(VAF_df, lab1, lab2, cortype = "kendall" ) {
 VAF_df <- subset(all_VAFs, select = c(id, treatment, ddPCR, Andre))
 colnames(VAF_df) <- c("id", "treatment", "VAF1", "VAF2")
 ddPCR_vs_Andre <- compare_VAF(
-  VAF_df, lab1 = "ddPCR", lab2 = "Andre", cortype = "kendall" )
+  VAF_df, lab1 = "ddPCR", lab2 = "Andre", lim = 25, cortype = "kendall" )
 
 png(paste0(plot_dir, "ddPCR_vs_Andre_VAFs.png"),
     height = 3.5,
@@ -115,7 +122,7 @@ dev.off()
 VAF_df <- subset(all_VAFs, select = c(id, treatment, ddPCR, new_VAF))
 colnames(VAF_df) <- c("id", "treatment", "VAF1", "VAF2")
 ddPCR_vs_new <- compare_VAF(
-  VAF_df, lab1 = "ddPCR", lab2 = "new", cortype = "kendall" )
+  VAF_df, lab1 = "ddPCR", lab2 = "new", lim = 25, cortype = "kendall" )
 
 png(paste0(plot_dir, "ddPCR_vs_new_VAFs.png"),
     height = 3.5,
@@ -129,7 +136,7 @@ dev.off()
 VAF_df <- subset(all_VAFs, select = c(id, treatment, Andre, new_VAF))
 colnames(VAF_df) <- c("id", "treatment", "VAF1", "VAF2")
 Andre_vs_new <- compare_VAF(
-  VAF_df, lab1 = "Andre", lab2 = "new", cortype = "kendall" )
+  VAF_df, lab1 = "Andre", lab2 = "new", lim = 40, cortype = "kendall" )
 
 png(paste0(plot_dir, "Andre_vs_new_VAFs.png"),
     height = 3.5,
@@ -138,3 +145,13 @@ png(paste0(plot_dir, "Andre_vs_new_VAFs.png"),
     units = "in")
   print(Andre_vs_new)
 dev.off()
+
+
+####################################################################################
+### 4. Plot VAF correlations without new detections ###
+####################################################################################
+
+filt_VAFs <- all_VAFs[!(all_VAFs$id %in% new_detections),]
+
+
+
