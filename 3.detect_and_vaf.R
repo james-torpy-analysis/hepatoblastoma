@@ -7,8 +7,8 @@ min_bp_coverage <- as.numeric(args[3])
 min_overlap <- as.numeric(args[4])
 min_supporting <- as.numeric(args[5])
 #projectname <- "hepatoblastoma"
-#samplename <- "324_040_D9YW9_TAGGCATG-CTCTCTAT_L001"
-#min_bp_coverage <- 20
+#samplename <- "324_022_D9HGF_CGAGGCTG-CTCTCTAT_L001"
+#min_bp_coverage <- 10
 #min_overlap <- 19
 #min_supporting <- 2
 
@@ -70,7 +70,7 @@ param <- ScanBamParam(
 ga <- readGAlignments(file_bam, use.names = TRUE, param = param)
 gr <- granges(ga, use.mcols = TRUE)
 
-# only keepreads within CTNNB1 for efficiency:
+# only keep reads within CTNNB1 for efficiency:
 gr <- gr[queryHits(findOverlaps(gr, CTNNB1_gr, type="within"))]
 mcols(gr) <- subset(mcols(gr), select = -strand)
 
@@ -93,249 +93,183 @@ mcols(gr)$supp <- mcols(gr)$flag >= 2048
 supp_gr <- gr[mcols(gr)$supp]
 filt_gr <- gr[gr$qname %in% supp_gr$qname]
 
-# keep read pairs with only 1-2 supplementary alignments, all mapped to same chromosome:
-spl_gr <- split(filt_gr, filt_gr$qname)
-split_gr <- unlist(as(spl_gr[
-  lapply(spl_gr, function(x) {
-    (length(x) == 3 | length(x) == 4) & length(unique(x$rname)) == 1
-  }) 
-], "GRangesList"))
-names(split_gr) <- NULL
+# write samfile:
+writeSam(file_bam, filt_gr$qname, 
+  paste0(out_bam_dir, "unfiltered_split_read_pairs.sam") )
 
-# save as RDS:
-saveRDS(split_gr, paste0(Robject_dir, "CTNNB1_filtered_split_reads.rds"))
+## fetch read pairs without supp alignments:
+non_supp_gr <- gr[!(gr$qname %in% supp_gr$qname)]
 
-# isolate and keep non-split reads:
-non_split_gr <- gr[!(gr$qname %in% split_gr$qname)]
-names(non_split_gr) <- NULL
-length(split_gr) + length(non_split_gr) == length(gr)
-
-saveRDS(non_split_gr, paste0(Robject_dir, "CTNNB1_filtered_non_split_reads.rds"))
+# write samfile:
+writeSam(file_bam, non_supp_gr$qname, 
+  paste0(out_bam_dir, "unfiltered_non_split_read_pairs.sam") )
 
 
 ## 2) identify deletion breakpoints from split reads:
 
-if (length(split_gr) > 0) {
+# following doesn't work - get error:
+# unable to find an inherited method for function ‘psetdiff’ for signature ‘"CompressedGRangesList", "CompressedGRangesList"’
+# spit into GrangesList:
+#grl <- split(gr, paste(mcols(gr)$qname, mcols(gr)$R))
+# find gaps between primary and supplementary alignments:
+#del <- psetdiff(range(grl), grl)
+# also tried on each element with lapply, but psetdiff only works on GRanges objects of same length:
+#del <- lapply(split_gr, function(x) {
+#  return(psetdiff(range(x), x)
+#})
 
-  # split by qname:
-  spl_gr <- split(split_gr, split_gr$qname)
-  
-  # determine deletion ranges from primary and supp alignments
-  deletions <- lapply(spl_gr, function(x) {
-    
-    # split R1 and 2:
-    read_spl <- split(x, x$R1)
-  
-    deletion <- lapply(read_spl, function(y) {
-      # if supp present, determine breakpoints depending on orientation:
-      if (any(y$supp)) {
-        if (end(y[y$supp]) > end(y[!y$supp])) {
-          bps <- c(end(y[!y$supp])-width(y[y$supp]), start(y[y$supp]))
-        } else {
-          bps <- c(end(y[y$supp]), start(y[!y$supp])+width(y[y$supp]))
-        }
-        return(GRanges(
-          seqnames = seqnames(y)[1],
-          ranges = IRanges(start = bps[1], end = bps[2]),
-          qname = x$qname[1]
-        ))
-      }
-    })
-    return(deletion[sapply(deletion, function(y) length(y) > 0)][[1]])
-  
-  })
-  initial_deletions <- unlist(as(deletions, "GRangesList"))
-  
-  # remove duplicate deletions:
-  deletions <- initial_deletions[!duplicated(initial_deletions)]
-  
-  # separate starts and ends:
-  deletion_starts <- GRanges(
-    seqnames = seqnames(deletions),
-    ranges = IRanges(start = start(deletions), width = 1),
-    strand = "+"
-  )
-  deletion_ends <- GRanges(
-    seqnames = seqnames(deletions),
-    ranges = IRanges(start = end(deletions), width = 1),
-    strand = "-"
-  )
-  
-  
-  ## 3) calculate VAFs for all deletions
-  
-  split_primary <- split_gr[split_gr$flag < 2000]
-  non_split_primary <- non_split_gr[non_split_gr$flag < 2000]
+# instead, for R1 or R2 with 2 ranges of same strand, did psetdiff for 
+# first range of GRanges  elements then pintersected the result with the 
+# other range.
+# made R1 or R2 GRanges with length != 2 return empty GRanges
 
-  # isolate read 2 in forward orientation for upstream breakpoint coords, 
-  # as it contains gene-speific primer:
-  fwd_split_R1 <- split_gr[split_gr$R1 & strand(split_gr) == "+"]
-  fwd_split_R2 <- split_primary[split_primary$R2 & strand(split_primary) == "+"]
-  fwd_non_split <- non_split_primary[non_split_primary$R2 & strand(non_split_primary) == "+"]
-  
-  # isolate read 2 in reverse orientation for downstream breakpoint coords, 
-  # as it contains gene-speific primer:
-  rev_split_R1 <- split_gr[split_gr$R1 & strand(split_gr) == "-"]
-  rev_split_R2 <- split_primary[split_primary$R2 & strand(split_primary) == "-"]
-  rev_non_split <- non_split_primary[non_split_primary$R2 & strand(non_split_primary) == "-"]
-  
-  deletions$upstream_supporting <- NA
-  deletions$upstream_non_supporting <- NA
-  deletions$downstream_supporting <- NA
-  deletions$downstream_non_supporting <- NA
-  deletions$upstream_VAF <- NA
-  deletions$downstream_VAF <- NA
-  deletions$combined_VAF <- NA
-  
-  for (i in seq_along(deletions)) {
+# annotate reads:
+gr$R <- "R1"
+gr$R[gr$R2] <- "R2"
+# spit into GrangesList:
+grl <- split(gr, paste(gr$qname, gr$R))
+# remove entries with supp alignments on different strand to corresponding
+# primary alignment:
+grl <- lapply(grl, function(x) x[length(unique(strand(x))) == 1])
+filt_reads <- unlist(as(grl, "GRangesList"))
 
-    # fetch qnames of split R2s which overlap either breakpoint coord of 
-    # deletion:
-    supporting_reads <- list(
-      upstream = fwd_split_R2$qname[
-        which(width(pintersect(fwd_split_R2, deletion_starts[i]+min_overlap)) >= 
-          min_overlap ) ], 
-      downstream = rev_split_R2$qname[
-        which(width(pintersect(rev_split_R2, deletion_ends[i]+min_overlap)) >= 
-          min_overlap ) ] )
-
-    # define 1 mb downstream of deletion end and upstream of deletion start:
-    end_dnstream <- flank(deletion_ends[i], 1e6, start = TRUE)
-    end_dnstream <- resize(end_dnstream, 1e6 + 1) ## add breakpoint position
-    start_upstream <- flank(deletion_starts[i], 1e6, start = TRUE)
-    start_upstream <- resize(start_upstream, 1e6 + 1) ## add breakpoint position
-    
-    # fetch qnames of R1s lying downstream of downstream bp, 
-    # or upstream of upstream bp:
-    R1_dnstream <- rev_split_R1$qname[
-      which(width(pintersect(rev_split_R1, end_dnstream)) >= min_overlap) ]
-    R1_upstream <- fwd_split_R1$qname[
-      which(width(pintersect(fwd_split_R1, start_upstream)) >= min_overlap) ]
-
-    # keep upstream supporting reads with R1 downstream of deletion, or
-    # downstream supporting reads with R1 upstream of deletion:
-    supporting_reads$upstream <- supporting_reads$upstream[
-      supporting_reads$upstream %in% R1_dnstream ]
-    supporting_reads$downstream <- supporting_reads$downstream[
-      supporting_reads$downstream %in% R1_upstream ]
-  
-    # fetch qnames of non-split reads which overlap either breakpoint coord of 
-    # deletion:
-    non_supporting_reads <- list(
-      upstream = fwd_non_split$qname[
-        which(width(pintersect(fwd_non_split, deletion_starts[i]+min_overlap)) >= 
-          min_overlap ) ], 
-      downstream = rev_non_split$qname[
-        which(width(pintersect(rev_non_split, deletion_ends[i]+min_overlap)) >= 
-          min_overlap ) ] )
-
-    # store for bams:
-    if (i==1) {
-      all_supporting <- list(supporting_reads)
-      all_non_supporting <- list(non_supporting_reads)
-    } else {
-      all_supporting[[i]] <- supporting_reads
-      all_non_supporting[[i]] <- non_supporting_reads
-    }
-  
-    # fill in numbers:
-    deletions$upstream_supporting[i] <- length(supporting_reads$upstream)
-    deletions$upstream_non_supporting[i] <- length(non_supporting_reads$upstream)
-    deletions$downstream_supporting[i] <- length(supporting_reads$downstream)
-    deletions$downstream_non_supporting[i] <- length(non_supporting_reads$downstream)
-    
-    # calculate deletion VAF:
-    deletions$upstream_VAF[i] <- deletions$upstream_supporting[i] /
-      (deletions$upstream_supporting[i] + deletions$upstream_non_supporting[i])
-    deletions$downstream_VAF[i] <- deletions$downstream_supporting[i]/
-      (deletions$downstream_supporting[i] + deletions$downstream_non_supporting[i])
-    deletions$combined_VAF[i] <- (deletions$upstream_supporting[i]+deletions$downstream_supporting[i])/
-      (deletions$upstream_supporting[i]+deletions$downstream_supporting[i] + 
-      (deletions$upstream_non_supporting[i]+deletions$downstream_non_supporting[i])/2)
-  
-  }
-  names(deletions) <- NULL
-
-  # format:
-  upstream_VAFs <- subset(
-    as.data.frame(deletions), 
-    select = -c(strand, qname, downstream_supporting, downstream_non_supporting, 
-      downstream_VAF, combined_VAF ) )
-  colnames(upstream_VAFs) <- gsub("upstream_", "", colnames(upstream_VAFs))
-  upstream_VAFs$type <- "upstream"
-  upstream_VAFs$ind <- seq_along(upstream_VAFs$VAF)
-
-  downstream_VAFs <- subset(
-    as.data.frame(deletions), 
-    select = -c(strand, qname, upstream_supporting, upstream_non_supporting, 
-      upstream_VAF, combined_VAF ) )
-  colnames(downstream_VAFs) <- gsub("downstream_", "", colnames(downstream_VAFs))
-  downstream_VAFs$type <- "downstream"
-  downstream_VAFs$ind <- seq_along(downstream_VAFs$VAF)
-
-  both_VAFs <- rbind(upstream_VAFs, downstream_VAFs)
-
-  # remove VAFs with less than min_bp_coverage total reads:
-  filtered_VAFs <- both_VAFs[
-    both_VAFs$supporting + both_VAFs$non_supporting >= min_bp_coverage, ]
-  # remove VAFs with less than min no supporting reads required:
-  filtered_VAFs <- filtered_VAFs[filtered_VAFs$supporting >= min_supporting, ]
-
-  # keep VAF with max supporting reads:
-  if (nrow(filtered_VAFs) > 0) {
-    selected_VAF <- filtered_VAFs[
-    filtered_VAFs$supporting == max(filtered_VAFs$supporting), ]
-
-    colnames(selected_VAF) <- gsub("upstream_", "", colnames(selected_VAF))
-    colnames(selected_VAF) <- gsub("downstream_", "", colnames(selected_VAF))
-    selected_VAF <- selected_VAF[which.max(selected_VAF$VAF),]
-
-    # keep and save deletions and VAFs:
-    saveRDS(selected_VAF, paste0(Robject_dir, "selected_VAF.rds"))
-    write.table(
-      as.data.frame(selected_VAF),
-      paste0(table_dir, "selected_VAF.txt"),
-      row.names = FALSE,
-      col.names = TRUE,
-      quote = FALSE,
-      sep = "\t" )
-
-    # write selected upstream bp supporting and non_supporting reads to SAMs:
-    selected_supporting <- all_supporting[[selected_VAF$ind]][
-      names(all_supporting[[selected_VAF$ind]]) == "upstream" ]
-    selected_non_supporting <- all_non_supporting[[selected_VAF$ind]][
-      names(all_non_supporting[[selected_VAF$ind]]) == "upstream" ]
-  
-    writeSam(file_bam, unlist(selected_supporting), 
-      paste0(out_bam_dir, "upstream_deletion_bp_", selected_VAF$start, "_", 
-        selected_VAF$end, "_supporting_reads.sam") )
-    writeSam(file_bam, unlist(selected_non_supporting), 
-      paste0(out_bam_dir, "upstream_deletion_bp_", selected_VAF$start, "_", 
-        selected_VAF$end, "_non_supporting_reads.sam") )
-    
-    # write selected downstream bp supporting and non_supporting reads to SAMs:
-    selected_supporting <- all_supporting[[selected_VAF$ind]][
-      names(all_supporting[[selected_VAF$ind]]) == "downstream" ]
-    selected_non_supporting <- all_non_supporting[[selected_VAF$ind]][
-      names(all_non_supporting[[selected_VAF$ind]]) == "downstream" ]
-  
-    writeSam(file_bam, unlist(selected_supporting), 
-      paste0(out_bam_dir, "downstream_deletion_bp_", selected_VAF$start, "_", 
-        selected_VAF$end, "_supporting_reads.sam") )
-    writeSam(file_bam, unlist(selected_non_supporting), 
-      paste0(out_bam_dir, "downstream_deletion_bp_", selected_VAF$start, "_", 
-        selected_VAF$end, "_non_supporting_reads.sam") )
-
+# find gaps between primary and supplementary alignments:
+del <- lapply(grl, function(x) {
+  if (length(x) == 2) {
+    diffrange <- psetdiff(range(x), x[1])
+    return(psetdiff(diffrange, x[2]))
   } else {
-     # create output file for snakemake:
-    selected_VAF <- NULL
-    saveRDS(selected_VAF, paste0(Robject_dir, "selected_VAF.rds"))
+    return(GRanges(NULL))
   }
+})
+
+# keep only unique deletion ranges:
+del <- unlist(as(del[sapply(del, function(x) length(x) > 0)], "GRangesList"))
+strand(del) <- "*"
+del <- unique(del)
+names(del) <- NULL
+# expand del range by 1 to include reads split at breakpoints:
+del <- del+1
+
+table(as.character(del))
+
+
+## 3) calculate VAFs for all deletions
+
+if (length(del) > 0) {
+
+  spl_gr <- split(filt_reads, filt_reads$qname)
+
+  # only keep read pairs containing both primary alignments:
+  filt_gr <- spl_gr[sapply(spl_gr, function(x) {
+    any(x$R == "R1" & x$flag < 2000) & any(x$R == "R2" & x$flag < 2000)
+  })]
+
+  # separate reads with R2 upstream, and those with R2 downstream:
+  upstream_R2 <- filt_gr[sapply(filt_gr, function(x) {
+    strand(x[x$R2 & x$flag < 2000]) == "+" & 
+      end(x[x$R2 & x$flag < 2000]) <= end(x[x$R1 & x$flag < 2000])
+  })]
+
+  dnstream_R2 <- filt_gr[sapply(filt_gr, function(x) {
+    strand(x[x$R2 & x$flag < 2000]) == "-" & 
+      end(x[x$R2 & x$flag < 2000]) >= end(x[x$R1 & x$flag < 2000])
+  })]
+
+  # separate split and non-split reads:
+  upstream_split <- unlist(as(
+    upstream_R2[sapply(upstream_R2, function(x) any(x$flag > 2000))], "GRangesList" ))
+  upstream_non_split <- unlist(as(
+    upstream_R2[sapply(upstream_R2, function(x) all(x$flag < 2000))], "GRangesList" ))
+  dnstream_split <- unlist(as(
+    dnstream_R2[sapply(dnstream_R2, function(x) any(x$flag > 2000))], "GRangesList" ))
+  dnstream_non_split <- unlist(as(
+    dnstream_R2[sapply(dnstream_R2, function(x) all(x$flag < 2000))], "GRangesList" ))
+
+  del_grl <- split(del, paste(start(del), end(del)))
+  VAF <- lapply(del_grl, function(x) {
+
+    # separate deletion breakpoints:
+    up_del <- x
+    end(up_del) <- start(x)
+    down_del <- x
+    start(down_del) <- end(x)
   
-  saveRDS(deletions, paste0(Robject_dir, "deletion_VAFs.rds"))
+    # fetch split reads which contain deletion breakpoint:
+    upstream_supp <- pintersect(upstream_split, up_del)
+    upstream_supp <- unique(upstream_supp$qname[upstream_supp$hit])
+    dnstream_supp <- pintersect(dnstream_split, down_del)
+    dnstream_supp <- unique(dnstream_supp$qname[dnstream_supp$hit])
+  
+    # define up and downstream regions:
+    del_upstream <- flank(x, 1e6, start = TRUE)
+    del_dnstream  <- flank(x, 1e6, start = FALSE)
+  
+    # fetch non-split reads flanking upstream breakpoint:
+    upstream_non_supp <- unique(upstream_non_split$qname[intersect(
+      which(width(pintersect(upstream_non_split, del_upstream)) >= min_overlap),
+      which(width(pintersect(upstream_non_split, x)) >= min_overlap) )])
+    dnstream_non_supp <- unique(dnstream_non_split$qname[intersect(
+      which(width(pintersect(dnstream_non_split, del_dnstream)) >= min_overlap),
+      which(width(pintersect(dnstream_non_split, x)) >= min_overlap) )])
+  
+    # write to bams:
+    writeSam(file_bam, upstream_supp, 
+      paste0(out_bam_dir, "deletion_", up_del, "_", down_del, 
+        "_upstream_supporting.sam" ))
+    writeSam(file_bam, dnstream_supp, 
+      paste0(out_bam_dir, "deletion_", up_del, "_", down_del, 
+        "_dnstream_supporting.sam" ))
+    writeSam(file_bam, upstream_non_supp, 
+      paste0(out_bam_dir, "deletion_", up_del, "_", down_del, 
+        "_upstream_non_supporting.sam" ))
+    writeSam(file_bam, dnstream_non_supp, 
+      paste0(out_bam_dir, "deletion_", up_del, "_", down_del, 
+        "_dnstream_non_supporting.sam" ))
+
+    # add to deletion record:
+    x$upstream_supp <- length(upstream_supp)
+    x$upstream_non_supp <- length(upstream_non_supp)
+    x$dnstream_supp <- length(dnstream_supp)
+    x$dnstream_non_supp <- length(dnstream_non_supp)
+    x$total_supp <- x$upstream_supp + x$dnstream_supp
+
+    # calculate VAFs:
+    x$up_VAF <- round(x$upstream_supp/(x$upstream_supp + x$upstream_non_supp), 3)
+    x$dn_VAF <- round(x$dnstream_supp/(x$dnstream_supp + x$dnstream_non_supp), 3)
+
+    # calculate weighted average VAF:
+    up_weight <- round(x$upstream_supp/(x$upstream_supp + x$dnstream_supp), 3)
+    dn_weight <- round(x$dnstream_supp/(x$upstream_supp + x$dnstream_supp), 3)
+    x$avg_VAF <- round((x$up_VAF*up_weight) + (x$dn_VAF*dn_weight), 3)
+
+    return(x)
+
+  })
+  VAF <- unlist(as(VAF, "GRangesList"))
+
+  # make NA values = 0:
+  VAF$up_VAF[is.na(VAF$up_VAF)] <- 0
+  VAF$dn_VAF[is.na(VAF$dn_VAF)] <- 0
+  VAF$avg_VAF[is.na(VAF$avg_VAF)] <- 0
+
+
+  ## 4) filter and save VAFs:
+
+  # select VAF with max supporting reads:
+  selected_VAF <- VAF[VAF$total_supp == max(VAF$total_supp)]
+
+  if (any(!is.na(VAF$avg_VAF))) {
+    selected_VAF <- VAF[which.max(VAF$avg_VAF)]
+  } else {
+    selected_VAF <- VAF[which.max(VAF$VAF)]
+  }
+
+  # keep and save deletions and VAFs:
+  saveRDS(selected_VAF, paste0(Robject_dir, "selected_VAF.rds"))
   write.table(
-    as.data.frame(deletions),
-    paste0(table_dir, "deletion_VAFs.txt"),
+    as.data.frame(selected_VAF),
+    paste0(table_dir, "selected_VAF.txt"),
     row.names = FALSE,
     col.names = TRUE,
     quote = FALSE,
