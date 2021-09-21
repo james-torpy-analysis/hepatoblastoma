@@ -68,7 +68,7 @@ if ! ( [ -f $bam_dir/$sample_name.dedup.sorted.by.coord.bam.bai ] && [ -f $bam_d
     O=$bam_dir/$sample_name.dedup.bam \
     M=$sample_name.dedup_metrics.txt \
     ASSUME_SORT_ORDER=queryname \
-    BARCODE_TAG="Mi" \
+    BARCODE_TAG="mi" \
     REMOVE_DUPLICATES=True
   
   samtools sort -o $bam_dir/$sample_name.dedup.sorted.by.coord.bam $bam_dir/$sample_name.dedup.bam
