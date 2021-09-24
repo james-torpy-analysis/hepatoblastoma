@@ -27,10 +27,6 @@ library(ggrepel)
 
 samplenames <- list.files(in_path, pattern = "324|409")
 samplenames <- grep(".gz", samplenames, invert = TRUE, value = TRUE)
-samplenames <- samplenames[!(samplenames %in% c(
-  "324_001_DB674_TAAGGCGA-CTCTCTAT_L001", 
-  "324_003_DB674_AGGCAGAA-CTCTCTAT_L001"
-))]
 
 VAFs <- lapply(samplenames, function(x) {
   print(x)
@@ -74,10 +70,11 @@ VAFs <- lapply(samplenames, function(x) {
 VAF_df <- do.call("rbind", VAFs)
 VAF_df$id <- gsub("021_1", "021", rownames(VAF_df))
 VAF_df$id <- gsub("_D.*$", "", VAF_df$id)
+VAF_df$id <- gsub("_combined", "", VAF_df$id)
 
 VAF_df$deletion <- paste0(VAF_df$seqnames, ":", VAF_df$start, "-", VAF_df$end)
 VAF_df$deletion[grep("NA", VAF_df$deletion)] <- NA
-VAF_df <- subset(VAF_df, select = -c(start, end, strand))
+VAF_df <- subset(VAF_df, select = -strand)
 
 
 ####################################################################################
@@ -91,13 +88,6 @@ prior_VAFs <- read.table(
 
 # format and make values numeric:
 all_VAFs <- merge(VAF_df, prior_VAFs, by="id")
-
-# add samples not in prior_VAFs:
-extra <- VAF_df[!(VAF_df$id %in% all_VAFs$id),]
-extra <- cbind(extra, data.frame(matrix(NA, nrow = nrow(extra), ncol = 8)))
-colnames(extra)[15:22] <- colnames(all_VAFs)[!(colnames(all_VAFs) %in% colnames(extra))]
-extra <- extra[, match(colnames(all_VAFs), colnames(extra))]
-all_VAFs <- rbind(all_VAFs, extra)
 
 # check distributions of VAFs:
 plot(hist(all_VAFs$ddPCR[all_VAFs$ddPCR != 0]))
@@ -155,7 +145,7 @@ ddPCR_vs_Andre_avg <- compare_VAF(
 pdf(paste0(plot_dir, "ddPCR_vs_avg_Andre_VAFs.pdf"),
     height = 3.5,
     width = 5)
-print(ddPCR_vs_Andre_avg)
+  print(ddPCR_vs_Andre_avg)
 dev.off()
 
 png(paste0(plot_dir, "ddPCR_vs_avg_Andre_VAFs.png"),
@@ -198,35 +188,6 @@ dev.off()
 # print(Andre_vs_new_avg_ext)
 # dev.off()
 
-# create up_Andre vs new VAF plot:
-VAF_df <- subset(all_VAFs, select = c(id, treatment, up_Andre, up_VAF))
-colnames(VAF_df) <- c("id", "treatment", "VAF1", "VAF2")
-up_Andre_vs_new <- compare_VAF(
-  VAF_df, lab1 = "Andre upstream", lab2 = "new upstream", lim = 0.4, cortype = "pearson" )
-
-png(paste0(plot_dir, "up_Andre_vs_new_VAFs.png"),
-    height = 3.5,
-    width = 5,
-    res = 300,
-    units = "in")
-print(up_Andre_vs_new)
-dev.off()
-
-# create down_Andre vs new VAF plot:
-VAF_df <- subset(all_VAFs, select = c(id, treatment, dn_Andre, dn_VAF))
-colnames(VAF_df) <- c("id", "treatment", "VAF1", "VAF2")
-dn_Andre_vs_new <- compare_VAF(
-  VAF_df, lab1 = "Andre downstream", lab2 = "new downstream", lim = 0.5, 
-  cortype = "pearson" )
-
-png(paste0(plot_dir, "dn_Andre_vs_new_VAFs.png"),
-    height = 3.5,
-    width = 5,
-    res = 300,
-    units = "in")
-print(dn_Andre_vs_new)
-dev.off()
-
 # create ddPCR vs new VAF plot:
 VAF_df <- subset(all_VAFs, select = c(id, treatment, ddPCR, avg_VAF))
 colnames(VAF_df) <- c("id", "treatment", "VAF1", "VAF2")
@@ -265,11 +226,11 @@ dev.off()
 all_VAFs$Deletion <- paste0(
   all_VAFs$seqnames, ":", all_VAFs$start, "-", all_VAFs$end )
 all_VAFs <- subset(all_VAFs, select = c(
-  id, treatment, deletion, deletion_confirmed, ddPCR, up_VAF, dn_VAF, avg_VAF, 
+  id, treatment, deletion, ddPCR, up_VAF, dn_VAF, avg_VAF, 
   bp_A_supp, bp_A_non_supp, bp_A_total, 
   bp_B_supp, bp_B_non_supp, bp_B_total ))
 colnames(all_VAFs) <- c(
-  "ID", "Treatment", "Deletion", "Deletion_confirmed", "ddPCR_VAF", 
+  "ID", "Treatment", "Deletion", "ddPCR_VAF", 
   "Upstream_VAF", "Downstream_VAF", "Avg_VAF",
   "Upstream_supporting", "Upstream_non_supporting", "Upstream_total",
   "Downstream_supporting", "Downstream_non_supporting", "Downstream_total" )
@@ -297,7 +258,7 @@ colnames(all_VAFs) <- c(
 # 
 # all_VAFs <- rbind(all_VAFs, no_detect_df)
 all_VAFs$Treatment <- factor(
-  all_VAFs$Treatment, levels = c("naive", "NACT", "resection", "relapse") )
+  all_VAFs$Treatment, levels = c("naive", "NACT", "resection", "relapse", "HepG2") )
 all_VAFs <- all_VAFs[order(all_VAFs$Treatment),]
 
 write.table(

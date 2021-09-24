@@ -7,10 +7,9 @@ min_overlap <- as.numeric(args[4])
 min_supporting <- as.numeric(args[5])
 
 #projectname <- "hepatoblastoma"
-#samplename <- "324_068_combined"
+#samplename <- "324_042_D9YW9_CGAGGCTG-CTCTCTAT_L001"
 #min_bp_coverage <- 10
 #min_overlap <- 19
-#min_supporting <- 2
 
 home_dir <- "/share/ScratchGeneral/jamtor"
 project_dir <- file.path(home_dir, "projects", projectname)
@@ -88,6 +87,16 @@ mcols(gr)$R[mcols(gr)$R2] <- "R2"
 keep <- intersect(names(gr)[gr$R1], names(gr)[gr$R2])
 gr <- gr[names(gr) %in% keep]
 
+#######
+## no split reads:
+#keep <- unique(names(gr)[gr %within% CTNNB1_gr])
+#gr_temp <- gr[names(gr) %in% keep]
+#print(length(gr_temp[gr_temp$flag > 2048]))
+#
+## write to bam:
+#writeSam(file_bam, gr_temp[gr_temp$flag > 2048]$qname, file.path(out_bam_dir, "unfiltered_split_CTNNB1_reads.sam") )
+#######
+
 ## check all reads have primary alignment
 stopifnot(all(names(gr) %in% names(gr)[gr$flag < 2048 & gr$R1]))
 stopifnot(all(names(gr) %in% names(gr)[gr$flag < 2048 & gr$R2]))
@@ -102,8 +111,12 @@ gr <- gr[which(!mcols(gr)$qname %in% excl)]
 keep <- unique(names(gr)[gr %within% CTNNB1_gr])
 gr <- gr[names(gr) %in% keep]
 
-# write samfile:
-writeSam(file_bam, gr$qname, paste0(out_bam_dir, "CTNNB1_reads.sam") )
+# write to bam:
+writeSam(file_bam, gr$qname, file.path(out_bam_dir, "CTNNB1_reads.sam") )
+
+# write split reads to bam for visualisation:
+print(length(gr[gr$flag > 2048]))
+writeSam(file_bam, gr[gr$flag > 2048]$qname, file.path(out_bam_dir, "filtered_split_CTNNB1_reads.sam") )
 
 ## 2) identify deletion breakpoints from split reads
 
@@ -246,11 +259,16 @@ if (length(del) > 0) {
         x$bp_B_total <- length(bp_B_supp) + length(bp_B_non_supp)
         x$total_supp <- x$bp_A_supp + x$bp_B_supp
 
-        ## calculate VAFs
+        ## calculate VAFs, removing those if total read no or non-supporting
+        # read number == 0:
         x$up_VAF <- x$bp_A_supp/x$bp_A_total
-        if (x$bp_A_total == 0) x$up_VAF <- 0
+        if (x$bp_A_total == 0 | x$bp_A_non_supp == 0) {
+          x$up_VAF <- 0
+        }
         x$dn_VAF <- x$bp_B_supp/x$bp_B_total
-        if (x$bp_B_total == 0) x$dn_VAF <- 0
+        if (x$bp_B_total == 0 | x$bp_B_non_supp == 0) {
+          x$dn_VAF <- 0
+        }
 
         ## calculate weighted average VAF
         up_weight <- x$bp_A_total/(x$bp_A_total + x$bp_B_total)

@@ -10,11 +10,12 @@
 # define and create directories:
 sample_name=$1
 capture_id=$2
-#sample_name="324_022_D9HGF_CGAGGCTG-CTCTCTAT_L001"
-#capture_id="CDHS-33412Z-324"
+sample_name="324_001_DB674_TAAGGCGA-CTCTCTAT_L001"
+capture_id="CDHS-33412Z-324"
+genome_build="hg38"
 
 home_dir="/share/ScratchGeneral/jamtor"
-project_dir="$home_dir/projects/hepatoblastoma"
+project_dir="$home_dir/projects/hepatoblastoma_"
 cont_dir="$project_dir/containers"
 ref_dir="$project_dir/refs"
 raw_dir="$project_dir/raw_files/$sample_name"
@@ -38,8 +39,8 @@ cat $working_dir/template_params.txt | \
   > $working_dir/run_sm_counter_v2.params.txt
 
 # copy primer and roi files to working_dir:
-\cp $ref_dir/$capture_id.primers.txt $working_dir
-\cp $ref_dir/$capture_id.roi.bed $working_dir
+\cp $ref_dir/$capture_id.primers_$genome_build.txt $working_dir
+\cp $ref_dir/$capture_id.roi_$genome_build.bed $working_dir
 
 # run pipeline through container:
 singularity exec \
