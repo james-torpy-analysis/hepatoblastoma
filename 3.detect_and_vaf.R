@@ -131,15 +131,36 @@ if (!file.exists(file.path(Robject_dir, "CTNNB1_reads.rds"))) {
   grl <- readRDS(file.path(Robject_dir, "CTNNB1_reads.rds"))
 }
 
+# take the range of all elements, and find the difference between
+# this and the primary and supp alignments in the elements which have them:
 del <- psetdiff(unlist(range(grl)), grl)
 
-## keep only unique deletion ranges
+# remove empty ranges and convert to gr:
 del <- unlist(del)
 strand(del) <- "*"
+
+######
+### new code ###
+
+# add read names to del and grl:
+del$qname <- gsub(" R.", "", names(del))
+names(grl) <-  gsub(" R.", "", names(grl))
+
+# fetch all alignments for each deletion-supporting read:
+support_gr <- unlist(grl[names(grl) %in% del$qname ], use.names = FALSE)
+support_grl <- split(support_gr, support_gr$qname)
+
+# keep only one mate of each read as deletion supporting:
+del <- del[!duplicated(del$qname)]
+
+# ensure no mates of each supporting read overlap deletion by min_overlap:
+del <- del[!(del$qname %in% names(support_gr)[width(unlist(pintersect(del, support_grl))) >= min_overlap])]
+######
+
+## keep only unique deletion ranges
+del <- unique(del)
 names(del) <- NULL
 table(as.character(del))
-del <- unique(del)
-
 
 ## 3) calculate VAFs for all deletions
 
@@ -261,11 +282,11 @@ if (length(del) > 0) {
 
         ## calculate VAFs, removing those if total read no or non-supporting
         # read number == 0:
-        x$up_VAF <- x$bp_A_supp/x$bp_A_total
+        x$up_VAF <- round(x$bp_A_supp/x$bp_A_total, 4)
         if (x$bp_A_total == 0 | x$bp_A_non_supp == 0) {
           x$up_VAF <- 0
         }
-        x$dn_VAF <- x$bp_B_supp/x$bp_B_total
+        x$dn_VAF <- round(x$bp_B_supp/x$bp_B_total, 4)
         if (x$bp_B_total == 0 | x$bp_B_non_supp == 0) {
           x$dn_VAF <- 0
         }
@@ -273,7 +294,7 @@ if (length(del) > 0) {
         ## calculate weighted average VAF
         up_weight <- x$bp_A_total/(x$bp_A_total + x$bp_B_total)
         dn_weight <- x$bp_B_total/(x$bp_A_total + x$bp_B_total)
-        x$avg_VAF <- (x$up_VAF*up_weight) + (x$dn_VAF*dn_weight)
+        x$avg_VAF <- round((x$up_VAF*up_weight) + (x$dn_VAF*dn_weight), 4)
         if (x$bp_A_total == 0 && x$bp_B_total == 0) x$avg_VAF <- 0
 
         return(x)
@@ -282,16 +303,14 @@ if (length(del) > 0) {
 
     VAF <- unlist(as(VAF, "GRangesList"))
 
-    ## 4) filter and save VAFs
-
-    ## select VAF with max supporting reads
-    selected_VAF <- VAF[VAF$total_supp == max(VAF$total_supp)]
+    # order VAFs according to no supporting reads:
+    VAF <- VAF[order(VAF$total_supp)]
 
     ## keep and save deletions and VAFs
-    saveRDS(selected_VAF, file.path(Robject_dir, "/selected_VAF.rds"))
+    saveRDS(VAF, file.path(Robject_dir, "/VAF.rds"))
     write.table(
-        as.data.frame(selected_VAF),
-        file.path(table_dir, "/selected_VAF.txt"),
+        as.data.frame(VAF),
+        file.path(table_dir, "/VAF.txt"),
         row.names = FALSE,
         col.names = TRUE,
         quote = FALSE,
@@ -299,6 +318,6 @@ if (length(del) > 0) {
 
 } else {
     ## create output file for snakemake
-    selected_VAF <- NULL
-    saveRDS(selected_VAF, paste0(Robject_dir, "/selected_VAF.rds"))
+    VAF <- NULL
+    saveRDS(VAF, paste0(Robject_dir, "/VAF.rds"))
 }
