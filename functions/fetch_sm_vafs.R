@@ -1,15 +1,15 @@
 fetch_sm_vafs <- function(sample_df, roi) {
   
   library(plyr)
-  print(sample_df$Sample_id)
+  print(sample_df$Library_id)
   if (exists("vcf")) rm(vcf)
   
   # read in variants:
   try(
     vcf <- read.table(
       paste0(
-        variant_path, "/", sample_df$Sample_id, "/", 
-        sample_df$Sample_id, ".smCounter.anno.vcf" ),
+        variant_path, "/", sample_df$Library_id, "/", 
+        sample_df$Library_id, ".smCounter.anno.vcf" ),
       ), silent = TRUE)
   
   if (exists("vcf")) {
