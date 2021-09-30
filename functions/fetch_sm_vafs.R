@@ -30,12 +30,12 @@ fetch_sm_vafs <- function(sample_df, roi) {
       qual = pass_var$V6,
       effect_size = sapply(strsplit(pass_var$V8, "\\|"), function(x) x[3]),
       VAF = round(as.numeric(
-        gsub("^.*=", "", sapply(strsplit(pass_var$V8, ";"), function(x) x[6]))
+        gsub("^.*=", "", gsub(",.*$", "", sapply(strsplit(pass_var$V8, ";"), function(x) x[6])))
       )*100, 1),
       info = pass_var$V8
     )
     
-    if (sample_df$Treatment == "tumour") {
+    if (sample_df$Treatment == "tumour" | sample_df$Treatment == "100") {
       # remove tumour gDNA variants with VAF == 100 as likely germline:
       pass_gr <- pass_gr[pass_gr$VAF != 100]
     } else {
@@ -64,16 +64,17 @@ fetch_sm_vafs <- function(sample_df, roi) {
     
     # keep best quality variant call:
     if (length(top_var) > 0) {
-      if (top_var$effect_size == 0) {
-        top_var <- GRanges(NULL)
+      if (top_var$effect_size == "MODIFIER" | top_var$effect_size == "LOW") {
+        return(GRanges(NULL))
+      } else {
+        return(top_var)
       }
     } else {
-      top_var <- GRanges(NULL)
+      return(GRanges(NULL))
     }
     
   } else {
-    top_var <- GRanges(NULL)
+    return(GRanges(NULL))
   }
   
-  return(top_var)
 }

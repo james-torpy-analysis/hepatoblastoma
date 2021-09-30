@@ -161,7 +161,7 @@ png(file.path(plot_dir, "ddPCR_vs_Andre_deletion_VAFs.png"),
 dev.off()
 
 # create average VAF vs Andre's average VAF plot:
-VAF_df <- subset(all_VAFs, select = c(Sample_id, Treatment, Andre_deletion_VAF, avg_VAF))
+VAF_df <- subset(all_VAFs, select = c(Sample_id, Treatment, Andre_deletion_VAF, Deletion_VAF))
 colnames(VAF_df) <- c("id", "treatment", "VAF1", "VAF2")
 VAF_df$treatment <- gsub("dilution_.*$", "HepG2", VAF_df$treatment)
 Andre_vs_new_avg <- compare_VAF(
@@ -182,7 +182,7 @@ print(Andre_vs_new_avg)
 dev.off()
 
 # create ddPCR vs new VAF plot:
-VAF_df <- subset(all_VAFs, select = c(Sample_id, Treatment, ddPCR_deletion_VAF, avg_VAF))
+VAF_df <- subset(all_VAFs, select = c(Sample_id, Treatment, ddPCR_deletion_VAF, Deletion_VAF))
 colnames(VAF_df) <- c("id", "treatment", "VAF1", "VAF2")
 VAF_df$treatment <- gsub("dilution_.*$", "HepG2", VAF_df$treatment)
 ddPCR_vs_new <- compare_VAF(

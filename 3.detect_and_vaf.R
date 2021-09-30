@@ -87,16 +87,6 @@ mcols(gr)$R[mcols(gr)$R2] <- "R2"
 keep <- intersect(names(gr)[gr$R1], names(gr)[gr$R2])
 gr <- gr[names(gr) %in% keep]
 
-#######
-## no split reads:
-#keep <- unique(names(gr)[gr %within% CTNNB1_gr])
-#gr_temp <- gr[names(gr) %in% keep]
-#print(length(gr_temp[gr_temp$flag > 2048]))
-#
-## write to bam:
-#writeSam(file_bam, gr_temp[gr_temp$flag > 2048]$qname, file.path(out_bam_dir, "unfiltered_split_CTNNB1_reads.sam") )
-#######
-
 ## check all reads have primary alignment
 stopifnot(all(names(gr) %in% names(gr)[gr$flag < 2048 & gr$R1]))
 stopifnot(all(names(gr) %in% names(gr)[gr$flag < 2048 & gr$R2]))
