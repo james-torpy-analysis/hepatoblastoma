@@ -4,12 +4,13 @@ projectname <- args[1]
 samplename <- args[2]
 min_bp_coverage <- as.numeric(args[3])
 min_overlap <- as.numeric(args[4])
-min_supporting <- as.numeric(args[5])
+max_overlap_del <- as.numeric(args[5])
 
-#projectname <- "hepatoblastoma"
-#samplename <- "324_042_D9YW9_CGAGGCTG-CTCTCTAT_L001"
-#min_bp_coverage <- 10
-#min_overlap <- 19
+projectname <- "hepatoblastoma"
+samplename <- "324_054_combined"
+min_bp_coverage <- 10
+min_overlap <- 19
+max_overlap_del <- 10
 
 home_dir <- "/share/ScratchGeneral/jamtor"
 project_dir <- file.path(home_dir, "projects", projectname)
@@ -22,9 +23,9 @@ Robject_dir <- file.path(out_path, "Rdata")
 table_dir <- file.path(out_path, "tables")
 out_bam_dir <- file.path(out_path, "bams")
 
-system(paste0("mkdir -p ", Robject_dir))
-system(paste0("mkdir -p ", table_dir))
-system(paste0("mkdir -p ", out_bam_dir))
+dir.create(Robject_dir, FALSE, TRUE)
+dir.create(table_dir, FALSE, TRUE)
+dir.create(out_bam_dir, FALSE, TRUE)
 
 library(GenomicAlignments)
 library(Rsamtools)
@@ -36,7 +37,6 @@ CTNNB1_gr <- GRanges(
     seqname = "chr3",
     ranges = IRanges(start = 41199422, end = 41240445),
     strand = "*")
-
 
 ## 1) read bam file
 
@@ -129,23 +129,21 @@ del <- psetdiff(unlist(range(grl)), grl)
 del <- unlist(del)
 strand(del) <- "*"
 
-######
-### new code ###
+print(max_overlap_del) 
 
-# add read names to del and grl:
-del$qname <- gsub(" R.", "", names(del))
-names(grl) <-  gsub(" R.", "", names(grl))
-
-# fetch all alignments for each deletion-supporting read:
-support_gr <- unlist(grl[names(grl) %in% del$qname ], use.names = FALSE)
-support_grl <- split(support_gr, support_gr$qname)
-
-# keep only one mate of each read as deletion supporting:
-del <- del[!duplicated(del$qname)]
-
-# ensure no mates of each supporting read overlap deletion by min_overlap:
-del <- del[!(del$qname %in% names(support_gr)[width(unlist(pintersect(del, support_grl))) >= min_overlap])]
-######
+## check deletion supporting reads are well behaved
+## i.e. mates not overlapping deletion
+del$qname <- sapply(strsplit(names(del), " R(1|2)"), "[", 1)
+exclude <- sapply(split(del, names(del)), function (x) {
+    read_name <- x$qname
+    support_gr <- gr[names(gr) == read_name]
+    print(support_gr)
+    w <- width(pintersect(support_gr, x))
+    print(w)
+    if (any(w >= max_overlap_del)) return(read_name)
+    else return()
+})
+del <- del[which(!(del$qname %in% unlist(exclude)))]
 
 ## keep only unique deletion ranges
 del <- unique(del)
@@ -209,11 +207,11 @@ if (length(del) > 0) {
         # write bams:
         writeSam(
           file_bam, bp_A_supp, paste0(
-            out_bam_dir, "/deletion_", start(x), "_to_", 
+            out_bam_dir, "/deletion_", start(x), "_to_",
             end(x),"_upstream_bp_supporting_reads.sam" ) )
         writeSam(
           file_bam, bp_B_supp, paste0(
-            out_bam_dir, "/deletion_", start(x), "_to_", 
+            out_bam_dir, "/deletion_", start(x), "_to_",
             end(x),"_downstream_bp_supporting_reads.sam" ) )
 
         ## define up and downstream regions
@@ -254,11 +252,11 @@ if (length(del) > 0) {
         # write bams:
         writeSam(
           file_bam, bp_A_non_supp, paste0(
-            out_bam_dir, "/deletion_", start(x), "_to_", 
+            out_bam_dir, "/deletion_", start(x), "_to_",
             end(x),"_upstream_bp_non_supporting_reads.sam" ) )
         writeSam(
           file_bam, bp_B_non_supp, paste0(
-            out_bam_dir, "/deletion_", start(x), "_to_", 
+            out_bam_dir, "/deletion_", start(x), "_to_",
             end(x),"_downstream_bp_non_supporting_reads.sam" ) )
 
         ## add to deletion record

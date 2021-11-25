@@ -1,5 +1,5 @@
-#home_dir <- "/share/ScratchGeneral/jamtor/"
-home_dir <- "/Users/torpor/clusterHome/"
+home_dir <- "/share/ScratchGeneral/jamtor/"
+#home_dir <- "/Users/torpor/clusterHome/"
 project_dir <- file.path(home_dir, "projects/hepatoblastoma")
 ref_dir <- file.path(project_dir, "refs")
 func_dir <- file.path(project_dir, "scripts/functions")
@@ -27,7 +27,7 @@ fetch_sm_vafs <- dget(file.path(func_dir, "fetch_sm_vafs.R"))
 ### 0. Load mutation data ###
 ####################################################################################
 
-# load Sanger/GeneGlobe SNV info:
+# load Sanger/GeneGlobe point_mut info:
 meta <- read.table(paste0(ref_dir, "/metadata.tsv"), header = T)
 
 # fetch sample and treatment info:
@@ -41,38 +41,38 @@ sm_vars <- unlist(as(lapply(meta_list, fetch_sm_vafs, CTNNB1), "GRangesList"))
 
 # format:
 var_df <- as.data.frame(sm_vars)
-var_df$new_SNV <- paste0(var_df$seqnames, ":", var_df$start, "_", 
+var_df$new_point_mut <- paste0(var_df$seqnames, ":", var_df$start, "_", 
   var_df$ref, ">", var_df$alt )
-var_df <- subset(var_df, select = c(new_SNV, effect_size, VAF) )
-colnames(var_df) <- c("smCounter2_SNV", "smCounter2_effect_size", "smCounter2_VAF")
+var_df <- subset(var_df, select = c(new_point_mut, effect_size, VAF) )
+colnames(var_df) <- c("smCounter2_point_mut", "smCounter2_effect_size", "smCounter2_VAF")
 var_df$Library_id <- rownames(var_df)
 
 # merge with prior info:
 final_vars <- merge(meta, var_df, by = "Library_id")
 extra_df <- meta[!(meta$Sample_id %in% var_df$Sample_id),]
-extra_df <- subset(
-  cbind(extra_df, as.data.frame(
-    matrix("not_detected", nrow = nrow(extra_df), ncol = 3) )),
-  select = c(Library_id, Patient_id, Sample_id, Treatment, Sanger_SNV, 
-    ddPCR_SNV_VAF, GeneGlobe_SNV_VAF, Sanger_deletion, Andre_deletion, 
-    Andre_deletion_confidence, ddPCR_deletion_VAF, Andre_deletion_VAF, 
-    V1, V2, V3) )
+extra_df <- cbind(extra_df, 
+  as.data.frame(matrix("not_detected", nrow = nrow(extra_df), ncol = 3)) )
+extra_df <- subset(extra_df,
+  select = c(Library_id, Patient_id, Sample_id, Treatment.dilution, Sanger_point_mut, 
+    ddPCR_point_mut_VAF, GeneGlobe_point_mut_VAF, Sanger_deletion, Andre_deletion, 
+    Andre_deletion_confidence, ddPCR_deletion_VAF, Andre_deletion_VAF, Resequenced,
+    V1, V2, V3 ))
 colnames(extra_df) <- colnames(final_vars)
 extra_df$smCounter2_effect_size <- NA
 
 # bind NA values, format:
 final_df <- subset(rbind(final_vars, extra_df), 
-  select = c(Patient_id, Sample_id, Library_id, Treatment, Sanger_SNV, smCounter2_SNV, 
-    ddPCR_SNV_VAF, GeneGlobe_SNV_VAF, smCounter2_VAF, smCounter2_effect_size,
+  select = c(Patient_id, Sample_id, Library_id, Treatment.dilution, Sanger_point_mut, smCounter2_point_mut, 
+    ddPCR_point_mut_VAF, GeneGlobe_point_mut_VAF, smCounter2_VAF, smCounter2_effect_size,
     Sanger_deletion, Andre_deletion, Andre_deletion_confidence, ddPCR_deletion_VAF, 
-    Andre_deletion_VAF ) )
+    Andre_deletion_VAF, Resequenced ) )
 
 # sort by original metadata order:
 final_df <- final_df[match(meta$Sample_id, final_df$Sample_id),]
 
 write.table(
   final_df,
-  file.path(table_dir, "sample_summary_with_smcounter_SNV.tsv"),
+  file.path(table_dir, "sample_summary_with_smcounter_point_mut.tsv"),
   sep = "\t",
   col.names = TRUE,
   row.names = FALSE,

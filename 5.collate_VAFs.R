@@ -1,7 +1,7 @@
 projectname <- "hepatoblastoma"
 
-#home_dir <- "/share/ScratchGeneral/jamtor/"
-home_dir <- "/Users/torpor/clusterHome"
+home_dir <- "/share/ScratchGeneral/jamtor/"
+#home_dir <- "/Users/torpor/clusterHome"
 project_dir <- file.path(home_dir, "projects", projectname)
 func_dir <- file.path(project_dir, "scripts/functions")
 result_dir <- file.path(project_dir, "results/")
@@ -29,7 +29,7 @@ compare_VAF <- dget(file.path(func_dir, "compare_VAF.R"))
 ####################################################################################
 
 summary_df <- read.table(
-  file.path(variant_dir, "sample_summary_with_smcounter_SNV.tsv"),
+  file.path(variant_dir, "sample_summary_with_smcounter_point_mut.tsv"),
   sep = "\t",
   header = TRUE )
 
@@ -84,28 +84,28 @@ VAF_df <- subset(VAF_df, select = c(Library_id, deletion, up_VAF, dn_VAF, avg_VA
 all_VAFs <- merge(summary_df, VAF_df, by="Library_id")
 
 all_VAFs <- subset(all_VAFs, select = c(
-  Patient_id, Sample_id, Library_id, Treatment, Sanger_SNV, 
-  smCounter2_SNV, ddPCR_SNV_VAF, GeneGlobe_SNV_VAF, smCounter2_VAF, 
+  Patient_id, Sample_id, Library_id, Treatment.dilution, Sanger_point_mut, 
+  smCounter2_point_mut, ddPCR_point_mut_VAF, GeneGlobe_point_mut_VAF, smCounter2_VAF, 
   smCounter2_effect_size, Sanger_deletion, Andre_deletion, 
   Andre_deletion_confidence, deletion, 
   ddPCR_deletion_VAF, Andre_deletion_VAF, avg_VAF, 
   up_VAF, dn_VAF, bp_A_supp, 
   bp_A_non_supp, bp_A_total, bp_B_supp, 
-  bp_B_non_supp, bp_B_total, total_supp ))
+  bp_B_non_supp, bp_B_total, total_supp, Resequenced ))
 
 colnames(all_VAFs) <- c(
-  "Patient_id", "Sample_id", "Library_id", "Treatment", "Sanger_SNV", 
-  "smCounter2_SNV", "ddPCR_SNV_VAF", "GeneGlobe_SNV_VAF", "smCounter2_VAF", 
+  "Patient_id", "Sample_id", "Library_id", "Treatment.dilution", "Sanger_point_mut", 
+  "smCounter2_point_mut", "ddPCR_point_mut_VAF", "GeneGlobe_point_mut_VAF", "smCounter2_VAF", 
   "smCounter2_effect_size", "Sanger_deletion", "Andre_deletion", 
   "Andre_deletion_confidence", "Deletion",
   "ddPCR_deletion_VAF", "Andre_deletion_VAF", "Deletion_VAF", 
   "Upstream_deletion_VAF", "Downstream_deletion_VAF", "Upstream_supporting", 
   "Upstream_non_supporting", "Upstream_total", "Downstream_supporting", 
-  "Downstream_non_supporting", "Downstream_total", "Total_supporting" )
+  "Downstream_non_supporting", "Downstream_total", "Total_supporting", "Resequenced" )
 
 # subset deletion columns only, order by patient and write:
 deletion_VAFs <- subset(all_VAFs, select = -c(
-  Sanger_SNV, smCounter2_SNV, ddPCR_SNV_VAF, GeneGlobe_SNV_VAF, smCounter2_VAF, 
+  Sanger_point_mut, smCounter2_point_mut, ddPCR_point_mut_VAF, GeneGlobe_point_mut_VAF, smCounter2_VAF, 
   smCounter2_effect_size ))
 deletion_VAFs$Library_id <- factor(
   deletion_VAFs$Library_id, levels = summary_df$Library_id )
@@ -133,16 +133,21 @@ write.table(
 ### 3. Plot VAF correlations ###
 ####################################################################################
 
-# check distributions of VAFs:
-plot(hist(all_VAFs$ddPCR[all_VAFs$ddPCR != 0]))
-plot(hist(all_VAFs$Andre_deletion_VAF[all_VAFs$Andre_deletion_VAF != 0]))
-plot(hist(all_VAFs$avg_VAF[all_VAFs$avg_VAF != 0]))
-dev.off()
+## check distributions of VAFs:
+#plot(hist(all_VAFs$ddPCR_deletion_VAF[all_VAFs$ddPCR_deletion_VAF != 0]))
+#plot(hist(all_VAFs$Andre_deletion_VAF[all_VAFs$Andre_deletion_VAF != 0]))
+#plot(hist(all_VAFs$avg_VAF[all_VAFs$avg_VAF != 0]))
+#dev.off()
 
 # create ddPCR vs Andre_deletion_VAF VAF plot:
-VAF_df <- subset(all_VAFs, select = c(Sample_id, Treatment, ddPCR_deletion_VAF, Andre_deletion_VAF))
+VAF_df <- all_VAFs
+VAF_df$Treatment.dilution[VAF_df$Patient_id %in% c("A673", "HepG2")] <- 
+  VAF_df$Patient_id[VAF_df$Patient_id %in% c("A673", "HepG2")]
+VAF_df <- subset(VAF_df, select = c(Sample_id, Treatment.dilution, ddPCR_deletion_VAF, 
+  Andre_deletion_VAF ))
 colnames(VAF_df) <- c("id", "treatment", "VAF1", "VAF2")
 VAF_df$treatment <- gsub("dilution_.*$", "HepG2", VAF_df$treatment)
+VAF_df$treatment[grep("[a-zA-Z]", VAF_df$treatment, invert=T)] <- 
 ddPCR_vs_Andre_avg <- compare_VAF(
   VAF_df, lab1 = "ddPCR", lab2 = "Andre_avg", lim = 0.4, cortype = "pearson" )
 
@@ -161,7 +166,11 @@ png(file.path(plot_dir, "ddPCR_vs_Andre_deletion_VAFs.png"),
 dev.off()
 
 # create average VAF vs Andre's average VAF plot:
-VAF_df <- subset(all_VAFs, select = c(Sample_id, Treatment, Andre_deletion_VAF, Deletion_VAF))
+VAF_df <- all_VAFs
+VAF_df$Treatment.dilution[VAF_df$Patient_id %in% c("A673", "HepG2")] <- 
+  VAF_df$Patient_id[VAF_df$Patient_id %in% c("A673", "HepG2")]
+VAF_df <- subset(VAF_df, select = c(Sample_id, Treatment.dilution, Andre_deletion_VAF, 
+  Deletion_VAF ))
 colnames(VAF_df) <- c("id", "treatment", "VAF1", "VAF2")
 VAF_df$treatment <- gsub("dilution_.*$", "HepG2", VAF_df$treatment)
 Andre_vs_new_avg <- compare_VAF(
@@ -182,7 +191,11 @@ print(Andre_vs_new_avg)
 dev.off()
 
 # create ddPCR vs new VAF plot:
-VAF_df <- subset(all_VAFs, select = c(Sample_id, Treatment, ddPCR_deletion_VAF, Deletion_VAF))
+VAF_df <- all_VAFs
+VAF_df$Treatment.dilution[VAF_df$Patient_id %in% c("A673", "HepG2")] <- 
+  VAF_df$Patient_id[VAF_df$Patient_id %in% c("A673", "HepG2")]
+VAF_df <- subset(VAF_df, select = c(Sample_id, Treatment.dilution, ddPCR_deletion_VAF, 
+  Deletion_VAF ))
 colnames(VAF_df) <- c("id", "treatment", "VAF1", "VAF2")
 VAF_df$treatment <- gsub("dilution_.*$", "HepG2", VAF_df$treatment)
 ddPCR_vs_new <- compare_VAF(

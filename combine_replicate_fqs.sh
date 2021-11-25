@@ -2,7 +2,11 @@ home_dir="/share/ScratchGeneral/jamtor"
 project_dir="$home_dir/projects/hepatoblastoma"
 raw_dir="$project_dir/raw_files"
 
-samplenames=( "324_070" )
+#samplenames=( "324_001" "324_031" "324_040" "324_043" "324_045" "324_047" \
+#  "324_050" "324_051" "324_052" "324_054" "324_056" "324_059" "324_060" \
+#  "324_061" "324_062" )
+
+samplenames=( "324_047" "324_050" "324_051" "324_052" "324_054" "324_059" "324_060" )
 
 for s in ${samplenames[@]}; do
 
@@ -24,6 +28,8 @@ for s in ${samplenames[@]}; do
 
   done
 
-  gzip $raw_dir/$s\_combined/*
+  gzip $raw_dir/$s*/*
+  cat $raw_dir/$s\_merge.log
+  printf "\n\n\n"
 
 done
