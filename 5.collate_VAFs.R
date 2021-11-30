@@ -91,7 +91,8 @@ all_VAFs <- subset(all_VAFs, select = c(
   ddPCR_deletion_VAF, Andre_deletion_VAF, avg_VAF, 
   up_VAF, dn_VAF, bp_A_supp, 
   bp_A_non_supp, bp_A_total, bp_B_supp, 
-  bp_B_non_supp, bp_B_total, total_supp, Resequenced ))
+  bp_B_non_supp, bp_B_total, total_supp, Resequenced,
+  Reads, UMIs, Reads_per_UMI ))
 
 colnames(all_VAFs) <- c(
   "Patient_id", "Sample_id", "Library_id", "Treatment.dilution", "Sanger_point_mut", 
@@ -101,7 +102,8 @@ colnames(all_VAFs) <- c(
   "ddPCR_deletion_VAF", "Andre_deletion_VAF", "Deletion_VAF", 
   "Upstream_deletion_VAF", "Downstream_deletion_VAF", "Upstream_supporting", 
   "Upstream_non_supporting", "Upstream_total", "Downstream_supporting", 
-  "Downstream_non_supporting", "Downstream_total", "Total_supporting", "Resequenced" )
+  "Downstream_non_supporting", "Downstream_total", "Total_supporting", "Resequenced",
+  "Reads", "UMIs", "Reads_per_UMI" )
 
 # subset deletion columns only, order by patient and write:
 deletion_VAFs <- subset(all_VAFs, select = -c(

@@ -1,3 +1,5 @@
+no_samples <- 51
+
 home_dir <- "/share/ScratchGeneral/jamtor/"
 #home_dir <- "/Users/torpor/clusterHome/"
 project_dir <- file.path(home_dir, "projects/hepatoblastoma")
@@ -30,6 +32,8 @@ fetch_sm_vafs <- dget(file.path(func_dir, "fetch_sm_vafs.R"))
 # load Sanger/GeneGlobe point_mut info:
 meta <- read.table(paste0(ref_dir, "/metadata.tsv"), header = T)
 
+stopifnot(nrow(meta) == no_samples)
+
 # fetch sample and treatment info:
 meta_list <- split(meta, meta$Library_id)
 
@@ -48,24 +52,15 @@ colnames(var_df) <- c("smCounter2_point_mut", "smCounter2_effect_size", "smCount
 var_df$Library_id <- rownames(var_df)
 
 # merge with prior info:
-final_vars <- merge(meta, var_df, by = "Library_id")
-extra_df <- meta[!(meta$Sample_id %in% var_df$Sample_id),]
-extra_df <- cbind(extra_df, 
-  as.data.frame(matrix("not_detected", nrow = nrow(extra_df), ncol = 3)) )
-extra_df <- subset(extra_df,
-  select = c(Library_id, Patient_id, Sample_id, Treatment.dilution, Sanger_point_mut, 
-    ddPCR_point_mut_VAF, GeneGlobe_point_mut_VAF, Sanger_deletion, Andre_deletion, 
-    Andre_deletion_confidence, ddPCR_deletion_VAF, Andre_deletion_VAF, Resequenced,
-    V1, V2, V3 ))
-colnames(extra_df) <- colnames(final_vars)
-extra_df$smCounter2_effect_size <- NA
+final_vars <- merge(meta, var_df, by = "Library_id", all=T)
 
 # bind NA values, format:
-final_df <- subset(rbind(final_vars, extra_df), 
+final_df <- subset(final_vars, 
   select = c(Patient_id, Sample_id, Library_id, Treatment.dilution, Sanger_point_mut, smCounter2_point_mut, 
     ddPCR_point_mut_VAF, GeneGlobe_point_mut_VAF, smCounter2_VAF, smCounter2_effect_size,
     Sanger_deletion, Andre_deletion, Andre_deletion_confidence, ddPCR_deletion_VAF, 
-    Andre_deletion_VAF, Resequenced ) )
+    Andre_deletion_VAF, Resequenced, 
+    Reads, UMIs, Reads_per_UMI ) )
 
 # sort by original metadata order:
 final_df <- final_df[match(meta$Sample_id, final_df$Sample_id),]
