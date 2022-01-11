@@ -4,7 +4,7 @@ home_dir <- "/share/ScratchGeneral/jamtor/"
 project_dir <- paste0(home_dir, "projects/hepatoblastoma/")
 ref_dir <- paste0(project_dir, "refs/")
 
-func_dir <- paste0(project_dir, "scripts/functions/6.fusion_call_heatmaps/")
+func_dir <- paste0(project_dir, "scripts/functions/")
 fusion_dir <- paste0(project_dir, "results/fusions/")
 VAF_dir <- paste0(project_dir, "results/detection_and_VAF/")
 
@@ -23,7 +23,7 @@ library(naturalsort)
 ### 0. Load functions and colours ###
 ####################################################################################
 
-mutation_heatmap <- dget(paste0(func_dir, "mutation_heatmap.R") )
+source(paste0(func_dir, "6.fusion_call_heatmaps_functions.R"))
 
 hm_cols <- c(
   pathology_detection = "#75EA3D",

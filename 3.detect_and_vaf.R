@@ -6,11 +6,11 @@ min_bp_coverage <- as.numeric(args[3])
 min_overlap <- as.numeric(args[4])
 max_overlap_del <- as.numeric(args[5])
 
-projectname <- "hepatoblastoma"
-samplename <- "324_054_combined"
-min_bp_coverage <- 10
-min_overlap <- 19
-max_overlap_del <- 10
+#projectname <- "hepatoblastoma"
+#samplename <- "324_054_combined"
+#min_bp_coverage <- 10
+#min_overlap <- 19
+#max_overlap_del <- 10
 
 home_dir <- "/share/ScratchGeneral/jamtor"
 project_dir <- file.path(home_dir, "projects", projectname)
@@ -31,7 +31,7 @@ library(GenomicAlignments)
 library(Rsamtools)
 library(scales)
 
-source(file.path(func_dir, "vaf_functions.R"))
+source(file.path(func_dir, "3.detect_and_vaf_functions.R"))
 
 CTNNB1_gr <- GRanges(
     seqname = "chr3",

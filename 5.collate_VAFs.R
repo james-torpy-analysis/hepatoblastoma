@@ -21,7 +21,7 @@ library(ggplot2)
 library(cowplot)
 library(ggrepel)
 
-compare_VAF <- dget(file.path(func_dir, "compare_VAF.R"))
+source(file.path(func_dir, "compare_VAF.R"))
 
 
 ####################################################################################

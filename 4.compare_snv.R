@@ -22,7 +22,7 @@ library(tibble)
 library(cowplot)
 library(ggrepel)
 
-fetch_sm_vafs <- dget(file.path(func_dir, "fetch_sm_vafs.R"))
+source(file.path(func_dir, "4.compare_snv_functions.R"))
 
 
 ####################################################################################
